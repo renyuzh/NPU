@@ -10,9 +10,10 @@ import java.util.Map;
 import java.util.Set;
 
 import npu.agents.clustering.ClustingMap;
-import npu.agents.communication.ConfigUtil;
+import npu.agents.communication.utils.ConfigUtil;
 import npu.agents.pf.strategy.ClearUtil;
 import npu.agents.search.AStar;
+import npu.agents.utils.KConstants;
 //import npu.agents.utils.SampleSearch;
 import rescuecore2.config.Config;
 import rescuecore2.connection.Connection;
@@ -62,7 +63,6 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 	@Override
 	protected void postConnect() {
 		super.postConnect();
-		ClustingMap.initMap(1, 100, model);
 		buildingIDs = new ArrayList<EntityID>();
         roadIDs = new ArrayList<EntityID>();
         refugeIDs = new ArrayList<EntityID>();

@@ -1,4 +1,4 @@
-package npu.agents.communication;
+package npu.agents.communication.utils;
 
 import java.util.ArrayList;
 

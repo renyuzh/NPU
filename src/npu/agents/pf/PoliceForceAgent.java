@@ -1,5 +1,6 @@
 package npu.agents.pf;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -10,14 +11,25 @@ import java.util.Set;
 import npu.agents.clustering.Cluster;
 import npu.agents.clustering.ClustingMap;
 import npu.agents.common.AbstractCommonAgent;
+import npu.agents.communication.model.Message;
+import npu.agents.communication.utils.ChangeSetUtil;
+import npu.agents.communication.utils.CommUtils.MessageID;
+import npu.agents.communication.utils.MessagesSendUtil;
+import npu.agents.utils.KConstants;
 import npu.agents.utils.Point;
 import rescuecore2.messages.Command;
 import rescuecore2.misc.geometry.GeometryTools2D;
 import rescuecore2.misc.geometry.Line2D;
 import rescuecore2.misc.geometry.Point2D;
 import rescuecore2.misc.geometry.Vector2D;
+import rescuecore2.standard.entities.AmbulanceTeam;
 import rescuecore2.standard.entities.Area;
 import rescuecore2.standard.entities.Blockade;
+import rescuecore2.standard.entities.Building;
+import rescuecore2.standard.entities.Civilian;
+import rescuecore2.standard.entities.FireBrigade;
+import rescuecore2.standard.entities.GasStation;
+import rescuecore2.standard.entities.Hydrant;
 import rescuecore2.standard.entities.PoliceForce;
 import rescuecore2.standard.entities.Road;
 import rescuecore2.standard.entities.StandardEntity;
@@ -33,10 +45,22 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
     private Set<EntityID> roadsHasCleared = new HashSet<EntityID>();
     private Set<EntityID> roadsID ;
     private Set<EntityID> refugeHasCleared = new HashSet<EntityID>();
+    private Set<EntityID> clearedEntities = new HashSet<EntityID>();
+    private Set<EntityID> firingBuildings = new HashSet<EntityID>();
+    private Set<EntityID> stuckingHumans = new HashSet<EntityID>();
+    private Set<EntityID> nearbyStuckingHumans = new HashSet<EntityID>();
+    private Set<EntityID> nearbyfiringBuildings = new HashSet<EntityID>();
+    private Set<EntityID> extinguishFires= new HashSet<EntityID>();
+    
+    private Set<Message> messagesSend = new HashSet<Message>();
+    
+    private EntityID[] prePosition = {};
+    private EntityID nowPosition;
 	@Override
 	protected void postConnect() {
 		super.postConnect();
 		try {
+			ClustingMap.initMap(KConstants.countOfpf, 100, model);
 			cluster = ClustingMap.assignAgentToCluster(me(), model);
 		    if(cluster == null){
 		    	   System.out.println("该agent没有分配到cluster");
@@ -56,11 +80,28 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	}
 	@Override
 	protected void think(int time, ChangeSet changes, Collection<Command> heard) {
+		  if(time < configuration.getIgnoreAgentCommand())
+			  return;
 	      if (time == configuration.getIgnoreAgentCommand()) {
 	            sendSubscribe(time,configuration.getPoliceChannel());//注册了该通道的都可以接收到
 	      }
+	      handleHeared(heard);
+	      ChangeSetUtil seenChanges = new ChangeSetUtil();
+	      seenChanges.handleChanges(model,changes);
+	      addFireInfo(seenChanges.getFireBuildings(),time);
+	      addInjuredHumanInfo(seenChanges.getInjuredHuman(),time);
+	      prePosition[1] = prePosition[0];
+	      prePosition[0] = nowPosition;
+	      nowPosition = me().getPosition();
+	      if(me().getHP() > 0 && (me().getBuriedness() > 0 || me().getDamage() > 0)) {
+	    	  handleInjuredMe(time);
+	    	  return;
+	      }
 	      removeClearedRoads();
 	      addAllClearedRoadsBack();
+	      if(isStucked()) {
+	    	  
+	      }
 	      //Am I near a blockade?
 	      clearNearBlockes(time);
 	      //Plan a path to a blocked seen area（不在清除范围内,去找路上能看到的有路障的点)
@@ -77,7 +118,71 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	      }
 	    }
 
-	    private void removeClearedRoads() {
+	   private void handleHeared(Collection<Command> heards) {
+	    	for(Command heard: heards) {
+	    		if(!(heard instanceof AKSpeak)) 
+	    			continue;
+	    		AKSpeak  info = (AKSpeak)heard;
+	    		String content = new String(info.getContent());
+
+	    		if(content.isEmpty())
+	    			continue;
+	    		String	typeOfhearedInfo = content.split(",")[0];
+	 		   int id = Integer.parseInt(typeOfhearedInfo);
+			   MessageID messageID = MessageID.values()[id];
+			   EntityID entityID = info.getAgentID();
+	    		if(configuration.getRadioChannels().contains(info.getChannel()))
+	    			handleRadio(entityID,messageID);
+	    		else
+	    			handleVoice(entityID,messageID);
+	    	}
+	   }
+	   
+	   private void handleVoice(EntityID voice,MessageID messageID) {
+		   switch(messageID){
+		   case STUCK_HUMAN:	nearbyStuckingHumans.add(voice);
+		   break;
+		   case BUILDING_ON_FIRE:	nearbyfiringBuildings.add(voice);
+		   break;
+		   default:break;
+		   }
+	   }
+	   private void handleRadio(EntityID radio,MessageID messageID) {
+		   switch(messageID){
+		   case STUCK_HUMAN:	stuckingHumans.add(radio);
+		   break;
+		   case BUILDING_ON_FIRE:	firingBuildings.add(radio);
+		   break;
+		   default:break;
+		   }
+	   }
+	   
+	   public void addFireInfo(Set<EntityID> fireBuildings,int time) {
+			for(EntityID buidingID : fireBuildings) {
+				Message message = new Message(MessageID.BUILDING_ON_FIRE,buidingID,time,configuration.getFireChannel());
+				messagesSend.add(message);
+			}
+		}
+
+		public void addInjuredHumanInfo(Set<EntityID> injuredHuman,int time) {
+			for(EntityID humanID : injuredHuman) {
+				Message message = new Message(MessageID.INJURED_HUMAN,humanID,time,configuration.getAmbulanceChannel());
+				messagesSend.add(message);
+			}		
+		}
+	  
+		public void handleInjuredMe(int time) {
+			Message message = new Message(MessageID.PF_INJURED,me().getID(),time,configuration.getAmbulanceChannel());
+			messagesSend.add(message);
+			sendRest(time);
+		}
+		public boolean isStucked() {
+			if(prePosition[0] == prePosition[1] && prePosition[0] == nowPosition)
+				return true;
+			else
+				return false;
+		}
+		private void removeClearedRoads() {
 		      EntityID pos = me().getPosition();
 		      if(roadsInMyCluster.contains(pos)) {
 		    	  StandardEntity entity = model.getEntity(pos);

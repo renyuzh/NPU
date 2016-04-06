@@ -6,6 +6,7 @@ import npu.agents.centre.FireCenter;
 import npu.agents.centre.PoliceCenter;
 import npu.agents.fb.FireBrigadeAgent;
 import npu.agents.pf.PoliceForceAgent;
+import npu.agents.utils.KConstants;
 import rescuecore2.Constants;
 import rescuecore2.components.ComponentConnectionException;
 import rescuecore2.components.ComponentLauncher;
@@ -29,6 +30,8 @@ public final class LaunchAgents {
 		int at = Integer.parseInt(args[2]);
 		int ac = Integer.parseInt(args[5]);
 		String host = args[6];
+
+		KConstants.countOfpf = pf;
 		
 		lauchAgents(host,fb,pf,at,fc,pc,ac);		
 	}
