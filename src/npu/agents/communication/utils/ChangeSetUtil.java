@@ -15,6 +15,7 @@ import rescuecore2.standard.entities.GasStation;
 import rescuecore2.standard.entities.Human;
 import rescuecore2.standard.entities.Hydrant;
 import rescuecore2.standard.entities.PoliceForce;
+import rescuecore2.standard.entities.Refuge;
 import rescuecore2.standard.entities.Road;
 import rescuecore2.standard.entities.StandardEntity;
 import rescuecore2.standard.entities.StandardWorldModel;
@@ -27,7 +28,7 @@ public class ChangeSetUtil {
 
 	private ArrayList<Hydrant> hydrants = new ArrayList<Hydrant>();
 	private ArrayList<Road> roads = new ArrayList<Road>();
-	private ArrayList<Blockade> blockades = new ArrayList<Blockade>();
+	private Set<Blockade> blockades = new HashSet<Blockade>();
 
 	private ArrayList<Civilian> civilians = new ArrayList<Civilian>();
 	private ArrayList<PoliceForce> policeForces = new ArrayList<PoliceForce>();
@@ -42,6 +43,8 @@ public class ChangeSetUtil {
 	private Map<EntityID,EntityID> humanStucked = new HashMap<EntityID,EntityID>();
 	private Map<EntityID,EntityID> recordHumanPosition = new HashMap<EntityID,EntityID>();
 	
+	private Set<Blockade> blockadesAroundRefuge = new HashSet<Blockade>();
+	private EntityID refugeID;
 	public void handleChanges(StandardWorldModel model,ChangeSet changes) {
 		   previousChangesClear();
 		   Set<EntityID> seenIDs = changes.getChangedEntities();
@@ -51,6 +54,8 @@ public class ChangeSetUtil {
 				case BUILDING:
 					buildings.add((Building) standardEntity);
 					break;
+				case REFUGE:
+					refugeID = standardEntity.getID();
 				case GAS_STATION:
 					gasStations.add((GasStation) standardEntity);
 					break;
@@ -116,6 +121,22 @@ public class ChangeSetUtil {
 	   public Set<EntityID> getInjuredHuman() {
 		   return humanInjured;
 	   }
+	   public Set<Blockade> getSeenBlockades() {
+		   return blockades;
+	   }
+	   public EntityID getRefugeID() {
+		   return refugeID;
+	   }
+	   
+	   public Set<Blockade> getSeenBlockadesAroundRefuge(Map<EntityID,Set<EntityID>> map){
+		   if(refugeID != null) {
+			   for(Blockade blockade:getSeenBlockades()) {
+				   if(map.get(refugeID).contains(blockade.getPosition()))
+					   blockadesAroundRefuge.add(blockade);
+			   }
+		   }
+		   return blockadesAroundRefuge;
+	   }
 	   public void previousChangesClear() {
 			gasStations.clear();
 
@@ -126,6 +147,9 @@ public class ChangeSetUtil {
 			civilians.clear();
 			policeForces.clear();
 			fireBrigades.clear();
-			ambulanceTeams.clear();		   
+			ambulanceTeams.clear();		
+			
+			blockadesAroundRefuge.clear();
+			refugeID = null;
 	   }
 }

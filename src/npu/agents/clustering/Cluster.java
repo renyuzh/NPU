@@ -1,7 +1,9 @@
 package npu.agents.clustering;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import npu.agents.utils.Point;
@@ -14,6 +16,7 @@ public class Cluster {
 	private Set<EntityID> roadsAroundCluster;
 	private EntityID agentID;
 	private Road closestRoadAroundCenter;
+	private Map<EntityID,Set<EntityID>> roadAroundRefuge = new HashMap<EntityID,Set<EntityID>>();
 	public Road getClosestRoadAroundCenter() {
 		return closestRoadAroundCenter;
 	}
@@ -33,17 +36,23 @@ public class Cluster {
 		if(!members.contains(member)&& member.getId()!=null)
 			members.add(member);
 	}
-	public Set<EntityID> getRoadsAroundCluster() {
-		return roadsAroundCluster;
-	}
 	public void setRoadsAroundCluster(Set<EntityID> roadsAroundCluster) {
 		this.roadsAroundCluster = roadsAroundCluster;
+	}
+	public void setRoadAroudRefuge(EntityID refugeID,Set<EntityID> roadsID) {
+		this.roadAroundRefuge.put(refugeID, roadsID);
 	}
 	public Point getCenterPoint() {
 		return centerPoint;
 	}
 	public void setCenterPoint(Point centerPoint) {
 		this.centerPoint = centerPoint;
+	}
+	public Set<EntityID> getRoadsAroundCluster() {
+		return roadsAroundCluster;
+	}
+	public Map<EntityID,Set<EntityID>> getRoadARoundRefuge() {
+		return roadAroundRefuge;
 	}
 	public List<Point> getMembers() {
 		return members;

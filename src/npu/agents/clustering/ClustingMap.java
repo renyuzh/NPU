@@ -11,6 +11,7 @@ import rescuecore2.log.Logger;
 import rescuecore2.misc.geometry.GeometryTools2D;
 import rescuecore2.standard.entities.Building;
 import rescuecore2.standard.entities.Human;
+import rescuecore2.standard.entities.Refuge;
 import rescuecore2.standard.entities.Road;
 import rescuecore2.standard.entities.StandardEntity;
 import rescuecore2.standard.entities.StandardEntityURN;
@@ -30,6 +31,7 @@ public class ClustingMap {
 		if(!hasCompute) {
 			clustingBuildings(k,iterTimes,model);
 			setRoadAroundCluster(model);
+			setRoadAroundRefugesInCluster(model);
 			hasCompute = true;
 		}	
 	}
@@ -72,6 +74,27 @@ public class ClustingMap {
 			}*/
 			cluster.setRoadsAroundCluster(roads);
 			//cluster.setClosestRoadAroundCenter(closest);
+		}
+	}
+	private static void setRoadAroundRefugesInCluster(StandardWorldModel model) {
+		for(Cluster cluster : clusters) {
+			Set<EntityID> roads = new HashSet<EntityID>();
+			EntityID refugeID = null;
+			List<Point> members = cluster.getMembers();
+			for(Point member : members) {
+					StandardEntity entity = model.getEntity(member.getId());
+					if(entity instanceof Refuge) {
+						Refuge refuge = (Refuge)entity;
+						for(EntityID id : refuge.getNeighbours()) {
+							StandardEntity nearEntity = model.getEntity(id);
+							if(nearEntity instanceof Road) {
+								roads.add(nearEntity.getID());
+								refugeID = id;
+							}
+						}
+					}
+			}
+			cluster.setRoadAroudRefuge(refugeID,roads);
 		}
 	}
 	private static Set<EntityID> getRoadAroundBuilding(Building building,StandardWorldModel model) {
