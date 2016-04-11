@@ -5,21 +5,24 @@ import rescuecore2.worldmodel.EntityID;
 
 public class Message {
 	private MessageID messageID;
-	private EntityID agentID;
+	private EntityID positionID;
 	private int time;
 	private int channel;
-	public Message(MessageID messageID,EntityID agentID, int time, int channel) {
+	public Message(MessageID messageID,EntityID positionID, int time, int channel) {
 		super();
 		this.messageID = messageID;
-		this.agentID = agentID;
+		this.positionID = positionID;
 		this.time = time;
 		this.channel = channel;
 	}
-	public EntityID getEntityID() {
-		return agentID;
+	public MessageID getMessageID() {
+		return messageID;
 	}
-	public void setEntityID(EntityID agentID) {
-		this.agentID = agentID;
+	public EntityID getPositionID() {
+		return positionID;
+	}
+	public void setPostionID(EntityID positionID) {
+		this.positionID = positionID;
 	}
 	public int getTime() {
 		return time;

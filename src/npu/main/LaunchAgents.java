@@ -32,7 +32,8 @@ public final class LaunchAgents {
 		String host = args[6];
 
 		KConstants.countOfpf = pf;
-		
+		KConstants.countOfat = at;
+		KConstants.countOffb = fb;
 		lauchAgents(host,fb,pf,at,fc,pc,ac);		
 	}
 

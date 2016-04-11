@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import npu.agents.clustering.ClustingMap;
+import npu.agents.communication.utils.ChangeSetUtil;
 import npu.agents.communication.utils.ConfigUtil;
 import npu.agents.pf.strategy.ClearUtil;
 import npu.agents.search.AStar;
@@ -59,7 +60,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
  private Map<EntityID, Set<EntityID>> neighbours;
  
  protected ClearUtil clearUtil;
-
+ protected ChangeSetUtil seenChanges;
 	@Override
 	protected void postConnect() {
 		super.postConnect();
@@ -87,6 +88,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
         neighbours = search.getGraph();
         configuration = new ConfigUtil(config);
         clearUtil = new ClearUtil();
+        seenChanges = new ChangeSetUtil();
 	}
     protected List<EntityID> randomWalkAroundCluster(Set<EntityID> roadsID) {
         List<EntityID> result = new ArrayList<EntityID>(RANDOM_WALK_LENGTH);

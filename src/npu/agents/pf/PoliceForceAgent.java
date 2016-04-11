@@ -2,6 +2,8 @@ package npu.agents.pf;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -15,15 +17,19 @@ import npu.agents.common.AbstractCommonAgent;
 import npu.agents.communication.model.Message;
 import npu.agents.communication.utils.ChangeSetUtil;
 import npu.agents.communication.utils.CommUtils.MessageID;
+import npu.agents.utils.DistanceSorter;
 import npu.agents.utils.KConstants;
 import npu.agents.utils.Point;
 import rescuecore2.messages.Command;
+import rescuecore2.misc.Pair;
 import rescuecore2.misc.geometry.GeometryTools2D;
 import rescuecore2.misc.geometry.Line2D;
 import rescuecore2.misc.geometry.Point2D;
 import rescuecore2.misc.geometry.Vector2D;
 import rescuecore2.standard.entities.Area;
 import rescuecore2.standard.entities.Blockade;
+import rescuecore2.standard.entities.Civilian;
+import rescuecore2.standard.entities.Human;
 import rescuecore2.standard.entities.PoliceForce;
 import rescuecore2.standard.entities.Road;
 import rescuecore2.standard.entities.StandardEntity;
@@ -38,17 +44,11 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	private Set<EntityID> roadsInMyCluster = new HashSet<EntityID>();
 	private Set<EntityID> roadsHasCleared = new HashSet<EntityID>();
 	private Set<EntityID> roadsID;
-	private List<EntityID> firingBuildings = new ArrayList<EntityID>();
-	private List<EntityID> stuckingHumans = new ArrayList<EntityID>();
-	private List<EntityID> nearbyStuckingHumans = new ArrayList<EntityID>();
-	private List<EntityID> nearbyfiringBuildings = new ArrayList<EntityID>();
-	private List<EntityID> refugeStuck = new ArrayList<EntityID>();
+	private List<EntityID> stuckedHumansPositions = new ArrayList<EntityID>();
+	private List<EntityID> blockedHumansPositions = new ArrayList<EntityID>();
+	private List<EntityID> refugeBlocked = new ArrayList<EntityID>();
 
-	private Set<Message> messagesSend = new HashSet<Message>();
-
-	private EntityID[] prePosition = {};
-	private EntityID nowPosition;
-
+	private Set<Message> messagesWillSend = new HashSet<Message>();
 	private Map<EntityID, Set<EntityID>> roadsAroundRefuge;
 	private List<EntityID> pathByPriotity;
 
@@ -69,7 +69,6 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			while (iter.hasNext()) {
 				roadsInMyCluster.add(iter.next());
 			}
-
 			roadsAroundRefuge = cluster.getRoadARoundRefuge();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -80,51 +79,93 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 
 	@Override
 	protected void think(int time, ChangeSet changes, Collection<Command> heard) {
-		// model.merge(changes);
 		if (time < configuration.getIgnoreAgentCommand())
 			return;
+		handleReceiveMessages(time, changes, heard);
+		sendAllVoiceMessages(time);
+		sendAllRadioMessages(time);
+	}
+
+	private void handleReceiveMessages(int time, ChangeSet changes, Collection<Command> heard) {
 		if (time == configuration.getIgnoreAgentCommand()) {
-			sendSubscribe(time, configuration.getPoliceChannel());// 注册了该通道的都可以接收到
+			sendSubscribe(time, configuration.getPoliceChannel());// 注册了该通道的可以接收发往该通道的消息
+			return;
 		}
-		handleHeared(heard);
-		ChangeSetUtil seenChanges = new ChangeSetUtil();
+		handleHeard(time, heard);
 		seenChanges.handleChanges(model, changes);
-		addFireInfo(seenChanges.getFireBuildings(), time);
-		addInjuredHumanInfo(seenChanges.getInjuredHuman(), time);
-		prePosition[1] = prePosition[0];
-		prePosition[0] = nowPosition;
-		nowPosition = me().getPosition();
-		if (me().getHP() > 0 && (me().getBuriedness() > 0 || me().getDamage() > 0)) {
-			handleInjuredMe(time);
+		addBuildingInfoToMessageSend(time);
+		addInjuredHumanInfoToMessageSend(time);
+		updateClearedRoads();
+		if (me().isHPDefined() && me().isBuriednessDefined() && me().getHP() > 0 && me().getBuriedness() > 0) {
+			handleBuriedMe(time);
 			return;
 		}
 		removeClearedRoads();
 		addAllClearedRoadsBack();
-		removeFinishedTask(nowPosition);
-		if (!refugeStuck.isEmpty()) {
-			pathByPriotity = search.getPath(nowPosition, refugeStuck.get(0));
-		} else if (!stuckingHumans.isEmpty()) {
-			pathByPriotity = search.getPath(nowPosition, stuckingHumans.get(0));
-		} else if (!firingBuildings.isEmpty()) {
-			pathByPriotity = search.getPath(nowPosition, firingBuildings.get(0));
+		if (!refugeBlocked.isEmpty()) {
+			distanceSort(refugeBlocked);
+			pathByPriotity = search.getPath(me().getPosition(), refugeBlocked.get(0), null);
+		} else if (!stuckedHumansPositions.isEmpty()) {
+			distanceSort(stuckedHumansPositions);
+			pathByPriotity = search.getPath(me().getPosition(), stuckedHumansPositions.get(0), null);
+		} else if (!blockedHumansPositions.isEmpty()) {
+			distanceSort(blockedHumansPositions);
+			pathByPriotity = search.getPath(me().getPosition(), blockedHumansPositions.get(0), null);
 		}
-		if (clearAllRoadsAroundRefuge(time, seenChanges))
-			;
-		else {
+		if (clearBlockadesAroundRefuge(time, seenChanges)) {
+			return;
+		} else {
 			basicClear(time, seenChanges);
 		}
 	}
 
-	private void removeFinishedTask(EntityID nowPosition2) {
-		if (refugeStuck.contains(nowPosition))
-			refugeStuck.remove(nowPosition);
-		if (stuckingHumans.contains(nowPosition))
-			stuckingHumans.remove(nowPosition);
-		if (firingBuildings.contains(nowPosition))
-			firingBuildings.remove(nowPosition);
+	private void distanceSort(List<EntityID> targets) {
+		Collections.sort(targets, new Comparator<EntityID>() {
+			@Override
+			public int compare(EntityID o1, EntityID o2) {
+				int distance1 = findDistanceTo(o1, me().getX(), me().getY());
+				int distance2 = findDistanceTo(o2, me().getX(), me().getY());
+				if (distance1 > distance2)
+					return 1;
+				if (distance1 < distance2)
+					return -1;
+				return 0;
+			}
+		});
 	}
 
-	private boolean clearAllRoadsAroundRefuge(int time, ChangeSetUtil seenChanges) {
+	private void updateClearedRoads() {
+		Set<EntityID> clearedRoadsIDs = seenChanges.getClearedRoads();
+		for (EntityID clearedRoadID : clearedRoadsIDs) {
+			if (stuckedHumansPositions.contains(clearedRoadID)) {
+				stuckedHumansPositions.remove(clearedRoadID);
+			}
+			if (blockedHumansPositions.contains(clearedRoadID)) {
+				blockedHumansPositions.remove(clearedRoadID);
+			}
+			if (refugeBlocked.contains(clearedRoadID)) {
+				refugeBlocked.remove(clearedRoadID);
+			}
+		}
+	}
+
+	private void sendAllRadioMessages(int time) {
+		for (Message message : messagesWillSend) {
+			String data = message.getMessageID().ordinal() + "," + message.getPositionID();
+			sendSpeak(time, message.getChannel(), data.getBytes());
+		}
+	}
+
+	private void sendAllVoiceMessages(int time) {
+		for (Message message : messagesWillSend) {
+			String data = message.getMessageID().ordinal() + "," + message.getPositionID();
+			sendSpeak(time, message.getChannel(), data.getBytes());
+		}
+
+	}
+
+	// 看到的，肯定只有一个refuge
+	private boolean clearBlockadesAroundRefuge(int time, ChangeSetUtil seenChanges) {
 		if (clearNearBlockes(time))
 			return true;
 		Set<Blockade> seenBlockades = seenChanges.getSeenBlockadesAroundRefuge(roadsAroundRefuge);
@@ -133,80 +174,124 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		return false;
 	}
 
-	private void handleHeared(Collection<Command> heards) {
+	private void handleHeard(int time, Collection<Command> heards) {
 		for (Command heard : heards) {
 			if (!(heard instanceof AKSpeak))
 				continue;
 			AKSpeak info = (AKSpeak) heard;
+			EntityID agentID = info.getAgentID();
 			String content = new String(info.getContent());
-			if (content.isEmpty())
+			if (content.isEmpty()) {
+				System.out.println("pf of " + me().getID() + " heard dropped message from " + info.getAgentID()
+						+ " from " + info.getChannel());
 				continue;
+			}
+			if (content.equalsIgnoreCase("Ouch") || content.equalsIgnoreCase("Help")) {
+				Civilian civilian = (Civilian) model.getEntity(agentID);
+				EntityID civilianPositionID = civilian.getPosition();
+				if (civilian.isHPDefined() && civilian.isBuriednessDefined() && civilian.isDamageDefined()
+						&& civilian.getHP() > 0 && civilian.getBuriedness() > 0) {
+					Message message = new Message(MessageID.CIVILIAN_INJURED, civilianPositionID, time,
+							configuration.getAmbulanceChannel());
+					messagesWillSend.add(message);
+				} else {
+					if (!stuckedHumansPositions.contains(civilianPositionID))
+						stuckedHumansPositions.add(civilianPositionID);
+				}
+				System.out.println("pf of " + me().getID() + "handle cicilian help");
+				continue;
+			}
 			String[] heardInfo = content.split(",");
 			String typeOfhearedInfo = heardInfo[0];
+			String positionOfInfo = heardInfo[1];
 			int id = Integer.parseInt(typeOfhearedInfo);
+			int postion = Integer.parseInt(positionOfInfo);
+			EntityID postionID = new EntityID(postion);
 			MessageID messageID = MessageID.values()[id];
-			EntityID entityID = info.getAgentID();
-			if (configuration.getRadioChannels().contains(info.getChannel()))
-				handleRadio(entityID, messageID);
-			else
-				handleVoice(entityID, messageID);
-			if (messageID.equals(MessageID.REFUGE_STUCK)) {
-				refugeStuck.add(new EntityID(Integer.parseInt(heardInfo[1])));
+			if (stuckedHumansPositions.contains(postionID) || blockedHumansPositions.contains(postionID))
+				continue;
+			if (!roadsID.contains(postionID))
+				continue;
+			if (roadsAroundRefuge.values().contains(postionID) && !refugeBlocked.contains(postionID)) {
+				refugeBlocked.add(postionID);
 			}
+			if (configuration.getRadioChannels().contains(info.getChannel()))
+				handleRadio(postionID, messageID);
+			else
+				handleVoice(postionID, messageID);
 		}
 	}
 
-	private void handleVoice(EntityID voice, MessageID messageID) {
+	private void handleVoice(EntityID postionID, MessageID messageID) {
+		System.out.println("pf of " + me().getID() + " is handle voice ");
 		switch (messageID) {
-		case HUMAN_STUCK:
-			nearbyStuckingHumans.add(voice);
+		case HUMAN_STUCKED:
+			stuckedHumansPositions.add(postionID);
 			break;
-		case BUILDING_ON_FIRE:
-			nearbyfiringBuildings.add(voice);
+		case HUMAN_BLOCKED:
+			blockedHumansPositions.add(postionID);
 			break;
 		default:
 			break;
 		}
 	}
 
-	private void handleRadio(EntityID radio, MessageID messageID) {
+	private void handleRadio(EntityID postionID, MessageID messageID) {
+		System.out.println("pf of " + me().getID() + " is handle radio ");
 		switch (messageID) {
-		case HUMAN_STUCK:
-			stuckingHumans.add(radio);
+		case HUMAN_STUCKED:
+			stuckedHumansPositions.add(postionID);
 			break;
-		case BUILDING_ON_FIRE:
-			firingBuildings.add(radio);
+		case HUMAN_BLOCKED:
+			blockedHumansPositions.add(postionID);
 			break;
 		default:
 			break;
 		}
 	}
 
-	public void addFireInfo(Set<EntityID> fireBuildings, int time) {
-		for (EntityID buidingID : fireBuildings) {
-			Message message = new Message(MessageID.BUILDING_ON_FIRE, buidingID, time, configuration.getFireChannel());
-			messagesSend.add(message);
+	public void addBuildingInfoToMessageSend(int time) {
+		for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
+			Message message = new Message(MessageID.BUILDING_UNBURNT, unburntBuidingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID extinguishBuildingID : seenChanges.getBuildingsExtinguished()) {
+			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, extinguishBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
+			Message message = new Message(MessageID.BUILDING_UNBURNT, warmBuidingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID onFireBuildingID : seenChanges.getBuildingsOnFire()) {
+			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, onFireBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
 		}
 	}
 
-	public void addInjuredHumanInfo(Set<EntityID> injuredHuman, int time) {
-		for (EntityID humanID : injuredHuman) {
-			Message message = new Message(MessageID.INJURED_HUMAN, humanID, time, configuration.getAmbulanceChannel());
-			messagesSend.add(message);
+	public void addInjuredHumanInfoToMessageSend(int time) {
+		for (Human human : seenChanges.getInjuredHuman()) {
+			Message message = new Message(MessageID.HUMAN_INJURED, human.getPosition(), time,
+					configuration.getAmbulanceChannel());
+			messagesWillSend.add(message);
 		}
 	}
 
 	public void handleInjuredMe(int time) {
 		Message message = new Message(MessageID.PF_INJURED, me().getID(), time, configuration.getAmbulanceChannel());
-		messagesSend.add(message);
+		messagesWillSend.add(message);
 		sendRest(time);
 	}
 
-	public boolean isStucked() {
-		if (prePosition[0] == prePosition[1] && prePosition[0] == nowPosition)
-			return true;
-		else
-			return false;
+	public void handleBuriedMe(int time) {
+		Message message = new Message(MessageID.PF_BURIED, me().getID(), time, configuration.getAmbulanceChannel());
+		messagesWillSend.add(message);
+		sendRest(time);
+		System.out.println("pf of " + me().getID() + "is buried at time " + time);
 	}
 
 	private void removeClearedRoads() {
@@ -246,7 +331,6 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			boolean traverslOk = traversalRoads(time);
 			if (!traverslOk) {
 				sendMove(time, randomWalkAroundCluster(roadsID));
-				System.out.println();
 			}
 			return;
 		}
@@ -279,7 +363,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	}
 
 	private boolean moveToSeenBlockade(int time, Set<Blockade> blockades) {
-		List<EntityID> nearPath = search.getPath(me().getPosition(), getBlockedArea(blockades));
+		List<EntityID> nearPath = search.getPath(me().getPosition(), getBlockedArea(blockades), null);
 		if (nearPath != null) {
 			Road r = (Road) model.getEntity(nearPath.get(nearPath.size() - 1));
 			Blockade b = getTargetBlockade(r, -1);
@@ -295,7 +379,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	private boolean traversalRoads(int time) {
 		if (roadsInMyCluster.size() != 0) {
 			EntityID[] roadsID = roadsInMyCluster.toArray(new EntityID[0]);
-			List<EntityID> path = search.getPath(me().getPosition(), roadsID[0]);
+			List<EntityID> path = search.getPath(me().getPosition(), roadsID[0], null);
 			if (path != null) {
 				System.out.println("遍历道路");
 				System.out.println();
@@ -308,7 +392,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	}
 
 	public EntityID getBlockedArea(Set<Blockade> seenBlockades) {
-		double minDistance = Integer.MAX_VALUE;
+		int minDistance = Integer.MAX_VALUE;
 		int x = me().getX();
 		int y = me().getY();
 		EntityID closestRoad = null;
@@ -317,7 +401,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			StandardEntity positionEntity = model.getEntity(positionID);
 			if (!(positionEntity instanceof Road))
 				continue;
-			double distance = findDistanceTo(blockade, x, y);
+			int distance = findDistanceTo(blockade, x, y);
 			if (distance < minDistance) {
 				minDistance = distance;
 				closestRoad = positionID;
@@ -325,6 +409,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		}
 		return closestRoad;
 	}
+
 	private Blockade getTargetBlockade() {
 		Area location = (Area) location();
 		Blockade result = getTargetBlockade(location, distance);
@@ -351,7 +436,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		int y = me().getY();
 		for (EntityID next : ids) {
 			Blockade b = (Blockade) model.getEntity(next);
-			double d = findDistanceTo(b, x, y);
+			int d = findDistanceTo(b, x, y);
 			if (maxDistance < 0 && d != 0)
 				System.out.println("移动到能看到的最短距离" + d);
 			if (d < maxDistance) {
@@ -362,7 +447,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		return null;
 	}
 
-	private double findDistanceTo(Blockade b, int x, int y) {
+	private int findDistanceTo(Blockade b, int x, int y) {
 		List<Line2D> lines = GeometryTools2D.pointsToLines(GeometryTools2D.vertexArrayToPoints(b.getApexes()), true);
 		double best = Double.MAX_VALUE;
 		Point origin = new Point(x, y);
@@ -373,9 +458,14 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			if (d < best) {
 				best = d;
 			}
-
 		}
-		return best;
+		return (int) best;
+	}
+
+	private int findDistanceTo(EntityID id, int x, int y) {
+		StandardEntity entity = model.getEntity(id);
+		Pair<Integer, Integer> pair = entity.getLocation(model);
+		return (int) Math.hypot(pair.first() - x, pair.second() - y);
 	}
 
 	@Override

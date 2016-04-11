@@ -1,7 +1,9 @@
 package npu.agents.search;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -49,7 +51,7 @@ public class AStar {
 	public Map<EntityID, Set<EntityID>> getGraph() {
 		return graph;
 	}
-	public List<EntityID>  getPath(EntityID startID,EntityID destID) {
+	public List<EntityID>  getPath(EntityID startID,EntityID destID,Set<Road> blockadeRoads) {
 		if(startID == null || destID == null || startID.equals(destID))
 			return null;
 		StandardEntity startEntity = world.getEntity(startID);
@@ -85,6 +87,8 @@ public class AStar {
 				 if(entity instanceof Building)
 					 continue;
 				 else if(entity instanceof Road){
+					 if(blockadeRoads != null && blockadeRoads.contains(entity))
+						 continue;
 					 Road r = (Road)entity;
 					 Point next = new Point(r.getX(),r.getY());
 					 next.setId(r.getID());
@@ -123,4 +127,66 @@ public class AStar {
 		}
 		return null;
 	}
+	 public List<EntityID> breadthFirstSearch(EntityID start, EntityID... goals) {
+	        return breadthFirstSearch(start, Arrays.asList(goals));
+	    }
+
+	    /**
+	       Do a breadth first search from one location to the closest (in terms of number of nodes) of a set of goals.
+	       @param start The location we start at.
+	       @param goals The set of possible goals.
+	       @return The path from start to one of the goals, or null if no path can be found.
+	    */
+	    public List<EntityID> breadthFirstSearch(EntityID start, Collection<EntityID> goals) {
+	        List<EntityID> open = new LinkedList<EntityID>();
+	        Map<EntityID, EntityID> ancestors = new HashMap<EntityID, EntityID>();
+	        open.add(start);
+	        EntityID next = null;
+	        boolean found = false;
+	        ancestors.put(start, start);
+	        do {
+	            next = open.remove(0);
+	            if (isGoal(next, goals)) {
+	                found = true;
+	                break;
+	            }
+	            Collection<EntityID> neighbours = graph.get(next);
+	            if (neighbours.isEmpty()) {
+	                continue;
+	            }
+	            for (EntityID neighbour : neighbours) {
+	                if (isGoal(neighbour, goals)) {
+	                    ancestors.put(neighbour, next);
+	                    next = neighbour;
+	                    found = true;
+	                    break;
+	                }
+	                else {
+	                    if (!ancestors.containsKey(neighbour)) {
+	                        open.add(neighbour);
+	                        ancestors.put(neighbour, next);
+	                    }
+	                }
+	            }
+	        } while (!found && !open.isEmpty());
+	        if (!found) {
+	            // No path
+	            return null;
+	        }
+	        // Walk back from goal to start
+	        EntityID current = next;
+	        List<EntityID> path = new LinkedList<EntityID>();
+	        do {
+	            path.add(0, current);
+	            current = ancestors.get(current);
+	            if (current == null) {
+	                throw new RuntimeException("Found a node with no ancestor! Something is broken.");
+	            }
+	        } while (current != start);
+	        return path;
+	    }
+
+	    private boolean isGoal(EntityID e, Collection<EntityID> test) {
+	        return test.contains(e);
+	    }
 }
