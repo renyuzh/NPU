@@ -3,6 +3,7 @@ package npu.agents.communication.utils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -46,11 +47,14 @@ public class ChangeSetUtil {
 	private Set<EntityID> buildingsOnFire = new HashSet<EntityID>();
 	private Set<EntityID> buildingsIsWarm = new HashSet<EntityID>();
 	private Set<EntityID> buildingsExtinguished = new HashSet<EntityID>();
-	private Set<Human> humanInjured = new HashSet<Human>();
-
+	private Set<Human> humanBuried = new HashSet<Human>();
+    private Set<Human> humanInjured = new HashSet<Human>();
 	private Set<Blockade> blockadesAroundRefuge = new HashSet<Blockade>();
 	private EntityID refugeID;
+	
+	private Set<EntityID> roadsNeedToClear = new HashSet<EntityID>();
 
+	private StandardWorldModel world ;
 	public void handleChanges(StandardWorldModel model, ChangeSet changes) {
 		previousChangesClear();
 		Set<EntityID> seenIDs = changes.getChangedEntities();
@@ -96,6 +100,7 @@ public class ChangeSetUtil {
 		analyzeBuildings();
 		analyzeRoads();
 		analyzeHumans();
+		world = model;
 	}
 
 	public void analyzeBuildings() {
@@ -130,6 +135,8 @@ public class ChangeSetUtil {
 		for(Road road: roads) {
 			if(road.isBlockadesDefined() && road.getBlockades().isEmpty()) {
 				clearedRoadsIDs.add(road.getID());
+				if(roadsNeedToClear.contains(road.getID()))
+					roadsNeedToClear.remove(road.getID());
 			}
 		}
 	}
@@ -138,20 +145,43 @@ public class ChangeSetUtil {
 		for (Human human : humans) {
 			if (human.isHPDefined() && human.isDamageDefined() && human.isBuriednessDefined()
 					&& human.isPositionDefined() && human.getHP() > 0
+					&& human.getBuriedness() > 0 ) {
+				humanBuried.add(human);
+			}
+			if (human.isHPDefined() && human.isDamageDefined() && human.isBuriednessDefined()
+					&& human.isPositionDefined() && human.getHP() > 0
 					&& (human.getBuriedness() > 0 || human.getDamage() > 0)) {
 				humanInjured.add(human);
 			}
 		}
 	}
 
-	public Set<Human> getInjuredHuman() {
-		return humanInjured;
+	public Set<Human> getBuriedHuman() {
+		return humanBuried;
 	}
-
+    public Set<Human> getInjuredHuman() {
+    	return humanInjured;
+    }
 	public Set<Blockade> getSeenBlockades() {
 		return blockades;
+	} 
+	public Set<Blockade> getBlockadesHumanStucked() {
+		Set<Blockade> blockades = new HashSet<Blockade>();
+        for(Blockade blockade: getSeenBlockades()) {
+        	ArrayList<Integer> X = new ArrayList<Integer>();
+        	ArrayList<Integer> Y = new ArrayList<Integer>();
+        	for (int i = 0; i < blockade.getApexes().length - 1; i = i + 2) {
+        		X.add(blockade.getApexes()[i]);
+        		Y.add(blockade.getApexes()[i + 1]);
+        	}
+        	for (Human human : humans) {
+        		if (in_or_out_of_polygon(X, Y, human.getX(), human.getY())) {
+        			blockades.add(blockade);
+        		}
+        	}
+        }
+		return blockades;
 	}
-
 	public EntityID getRefugeID() {
 		return refugeID;
 	}
@@ -185,10 +215,6 @@ public class ChangeSetUtil {
 		return buildingsOnFire;
 	}
 
-	public Set<Human> getHumanInjured() {
-		return humanInjured;
-	}
-
 	public void previousChangesClear() {
 		gasStations.clear();
 
@@ -208,6 +234,27 @@ public class ChangeSetUtil {
 		buildingsIsWarm.clear();
 		buildingsExtinguished.clear();
 		buildingsOnFire.clear();
-		humanInjured.clear();
+		humanBuried.clear();
 	}
+	public  boolean isBlocked(EntityID lastPosition, Human me,
+			double lastPositionX, double lastPositionY) {
+		return (lastPosition != null
+				&& lastPosition.getValue() == me.getPosition().getValue() && Math
+				.hypot(Math.abs(me.getX() - lastPositionX),
+						Math.abs(me.getY() - lastPositionY)) < 8000);
+	}
+	public  boolean in_or_out_of_polygon(ArrayList<Integer> X,
+			ArrayList<Integer> Y, int x, int y) {
+		int i, j;
+		boolean c = false;
+		for (i = 0, j = X.size() - 1; i < X.size(); j = i++) {
+			if ((((Y.get(i) <= y) && (y < Y.get(j))) || ((Y.get(j) <= y) && (y < Y
+					.get(i))))
+					&& (x < (X.get(j) - X.get(i)) * (y - Y.get(i))
+							/ (Y.get(j) - Y.get(i)) + X.get(i)))
+				c = !c;
+		}
+		return c;
+	}
+	
 }

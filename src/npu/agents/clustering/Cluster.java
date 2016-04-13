@@ -2,6 +2,7 @@ package npu.agents.clustering;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,9 +58,9 @@ public class Cluster {
 	public List<Point> getMembers() {
 		return members;
 	}
-	public List<EntityID> getMembersID() {
+	public Set<EntityID> getMembersID() {
 		List<Point> points = this.getMembers();
-		List<EntityID> ids = new ArrayList<EntityID>();
+		Set<EntityID> ids = new HashSet<EntityID>();
 		for(Point  point : points) {
 			ids.add(point.getId());
 		}

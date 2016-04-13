@@ -51,7 +51,8 @@ public class ClustingMap {
 			 * point.setCanPass(false); Set<Point> neighbours =
 			 * getNeighbours(building,model); point.setNeighbours(neighbours);
 			 */
-			allPoints.add(point);
+			if(!allPoints.contains(point))
+				allPoints.add(point);
 		}
 		clusters = KMeans.getClusters(k, iterTimes, allPoints);
 	}

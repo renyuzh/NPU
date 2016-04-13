@@ -36,4 +36,30 @@ public class Message {
 	public void setChannel(int channel) {
 		this.channel = channel;
 	}
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((messageID == null) ? 0 : messageID.hashCode());
+		result = prime * result + ((positionID == null) ? 0 : positionID.hashCode());
+		return result;
+	}
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		Message other = (Message) obj;
+		if (messageID != other.messageID)
+			return false;
+		if (positionID == null) {
+			if (other.positionID != null)
+				return false;
+		} else if (!positionID.equals(other.positionID))
+			return false;
+		return true;
+	}
+	
+	
 }
