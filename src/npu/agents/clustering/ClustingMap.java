@@ -2,8 +2,10 @@ package npu.agents.clustering;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import npu.agents.utils.Point;
@@ -21,7 +23,7 @@ import rescuecore2.worldmodel.EntityID;
 public class ClustingMap {
 	private static List<Cluster> clusters;
 	private static boolean hasCompute = false;
-
+	private static Map<EntityID,Set<EntityID>> entrances= new HashMap<EntityID,Set<EntityID>>();
 	/**
 	 * 将给定地图的建筑物聚类，并设置每簇周围的道路
 	 * 
@@ -65,6 +67,7 @@ public class ClustingMap {
 			for (Point member : members) {
 				StandardEntity entity = model.getEntity(member.getId());
 				Set<EntityID> r = getRoadAroundBuilding((Building) entity, model);
+				setBuildingEntrance((Building) entity,r);
 				roads.addAll(r);
 			}
 			/*
@@ -115,6 +118,12 @@ public class ClustingMap {
 			}
 		}
 		return roads;
+	}
+	private static void setBuildingEntrance(Building building,Set<EntityID> roadsIDs) {
+		entrances.put(building.getID(), roadsIDs);
+	}
+	public static Map<EntityID,Set<EntityID>> getBuildingEntrances(){
+		return entrances;
 	}
 
 	/**

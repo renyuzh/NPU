@@ -25,6 +25,7 @@ import rescuecore2.connection.Connection;
 import rescuecore2.messages.Command;
 import rescuecore2.misc.Pair;
 import rescuecore2.standard.components.StandardAgent;
+import rescuecore2.standard.entities.Blockade;
 import rescuecore2.standard.entities.Building;
 import rescuecore2.standard.entities.Human;
 import rescuecore2.standard.entities.Hydrant;
@@ -67,7 +68,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 	protected ClearUtil clearUtil;
 	protected ChangeSetUtil seenChanges;
 
-	private Map<EntityID, Set<EntityID>> roadsAroundRefuges;
+	private Map<EntityID, Set<EntityID>> entrancesOfRefuges;
 
 	@Override
 	protected void postConnect() {
@@ -110,8 +111,17 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 			Collections.shuffle(possible, random);
 			boolean found = false;
 			for (EntityID next : possible) {
-				// 只能在该簇内的道路遍历
-				if (roadsID.contains(next)) {
+				// 警察和消防只能在该簇内的道路上遍历，医生都要遍历
+				if (roadsID != null && roadsID.contains(next)) {
+					if (seen.contains(next)) {
+						continue;
+					}
+					current = next;
+					found = true;
+					System.out.print("在该簇内的道路遍历");
+					break;
+				}
+				if (roadsID == null) {
 					if (seen.contains(next)) {
 						continue;
 					}
@@ -128,7 +138,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		return result;
 	}
 
-	protected Map<EntityID, Set<EntityID>> getRoadsAroundRefuges() {
+	protected Map<EntityID, Set<EntityID>> getEntrancesOfRefuges() {
 		Set<EntityID> roads = new HashSet<EntityID>();
 		EntityID refugeID = null;
 		for (Refuge refuge : refuges) {
@@ -140,14 +150,15 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 				}
 			}
 			if (refugeID != null) {
-				roadsAroundRefuges.put(refugeID, roads);
+				entrancesOfRefuges.put(refugeID, roads);
 				refugeID = null;
 				roads.clear();
 			}
 		}
-		return roadsAroundRefuges;
+		return entrancesOfRefuges;
 	}
-	protected void distanceSort(List<EntityID> targets,final Human me) {
+
+	protected void distanceSort(List<EntityID> targets, final Human me) {
 		Collections.sort(targets, new Comparator<EntityID>() {
 			@Override
 			public int compare(EntityID o1, EntityID o2) {
@@ -162,9 +173,36 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		});
 	}
 
-	private int findDistanceTo(EntityID id, int x, int y) {
+	protected int findDistanceTo(EntityID id, int x, int y) {
 		StandardEntity entity = model.getEntity(id);
 		Pair<Integer, Integer> pair = entity.getLocation(model);
 		return (int) Math.hypot(pair.first() - x, pair.second() - y);
+	}
+
+	protected EntityID positionMeStuckedIn(Set<Blockade> seenBlockades, Human me) {
+		Set<Blockade> blockades = new HashSet<Blockade>();
+		for (Blockade blockade : seenBlockades) {
+			ArrayList<Integer> X = new ArrayList<Integer>();
+			ArrayList<Integer> Y = new ArrayList<Integer>();
+			for (int i = 0; i < blockade.getApexes().length - 1; i = i + 2) {
+				X.add(blockade.getApexes()[i]);
+				Y.add(blockade.getApexes()[i + 1]);
+			}
+			if (in_or_out_of_polygon(X, Y, me.getX(), me.getY())) {
+				return blockade.getPosition();
+			}
+		}
+		return null;
+	}
+
+	public boolean in_or_out_of_polygon(ArrayList<Integer> X, ArrayList<Integer> Y, int x, int y) {
+		int i, j;
+		boolean c = false;
+		for (i = 0, j = X.size() - 1; i < X.size(); j = i++) {
+			if ((((Y.get(i) <= y) && (y < Y.get(j))) || ((Y.get(j) <= y) && (y < Y.get(i))))
+					&& (x < (X.get(j) - X.get(i)) * (y - Y.get(i)) / (Y.get(j) - Y.get(i)) + X.get(i)))
+				c = !c;
+		}
+		return c;
 	}
 }

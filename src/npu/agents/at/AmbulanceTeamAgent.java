@@ -61,6 +61,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 	private List<EntityID> buriedPfPostions = new ArrayList<EntityID>();
 	private List<EntityID> buriedHumanPostions = new ArrayList<EntityID>();
 	private List<EntityID> seriouslyDamageHumans = new ArrayList<EntityID>();
+	private Map<EntityID, Set<EntityID>> buildingEntrances;
 
 	@Override
 	protected void postConnect() {
@@ -68,6 +69,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 		try {
 			ClustingMap.initMap(KConstants.countOfat, 100, model);
 			cluster = ClustingMap.assignAgentToCluster(me(), model);
+			buildingEntrances = ClustingMap.getBuildingEntrances();
 			if (cluster == null) {
 				System.out.println("该agent没有分配到cluster");
 				return;
@@ -109,9 +111,13 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 			return;
 		}
 		if (!buriedHumanPostions.isEmpty()) {
-			distanceSort(buriedHumanPostions,me());
-			pathByPriotity = search.getPath(me().getPosition(), buriedHumanPostions.get(0), null);
-		} 
+			distanceSort(buriedHumanPostions, me());
+			EntityID dest = ((EntityID[]) buildingEntrances.get(buriedHumanPostions.get(0)).toArray())[0];
+			pathByPriotity = search.getPath(me().getPosition(), dest, null);
+			if (pathByPriotity != null)
+				pathByPriotity.add(buriedHumanPostions.get(0));
+		}
+
 		basicRescue(time);
 	}
 
@@ -166,7 +172,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message1);
 		}
-		for (Blockade blockadeStuckedHuman : seenChanges.getBlockadesHumanStucked()) {
+		for (Blockade blockadeStuckedHuman : seenChanges.getBlockadesHumanStuckedIn()) {
 			Message message2 = new Message(MessageID.HUMAN_STUCKED, blockadeStuckedHuman.getPosition(), time,
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message2);
@@ -279,26 +285,27 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 			if (prepareRescue(next, time)) {
 				return true;
 			} else {
-				/*
-				 * EntityID targetPositionID = next.getPosition();
-				 * StandardEntity targetPosition =
-				 * model.getEntity(targetPositionID); EntityID dest = null;
-				 * if(targetPosition instanceof Building) { for(EntityID id
-				 * :((Building) targetPosition).getNeighbours()) {
-				 * StandardEntity entity = model.getEntity(id); if(entity
-				 * instanceof Road) { dest = entity.getID(); break; } } }
-				 * if(dest != null)
-				 */
-
-				List<EntityID> path = search.getPath(me().getPosition(), next.getPosition(), null);
+				if (blockadesBlockRoadTotally(time)) {
+					return false;
+				}
+				EntityID targetPositionID = next.getPosition();
+				StandardEntity targetPosition = model.getEntity(targetPositionID);
+				EntityID dest = null;
+				if (targetPosition instanceof Building) {
+					dest = ((EntityID[]) buildingEntrances.get(targetPosition.getID()).toArray())[0];
+				}
+				if (dest == null)
+					return false;
+				List<EntityID> path = search.getPath(me().getPosition(), dest, null);
 				if (path != null) {
 					Logger.info("Moving to target");
+					path.add(targetPositionID);
 					sendMove(time, path);
 					return true;
 				}
 			}
 		}
-		if(pathByPriotity != null){
+		if (pathByPriotity != null) {
 			sendMove(time, pathByPriotity);
 			return true;
 		}
@@ -315,9 +322,9 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 				return true;
 			} else {
 				// Move to a refuge
-				List<EntityID> refugeIDs = new ArrayList<EntityID>(getRoadsAroundRefuges().keySet());
-				distanceSort(refugeIDs,me());
-				EntityID dest = ((EntityID[]) getRoadsAroundRefuges().get(refugeIDs.get(0)).toArray())[0];
+				List<EntityID> refugeIDs = new ArrayList<EntityID>(getEntrancesOfRefuges().keySet());
+				distanceSort(refugeIDs, me());
+				EntityID dest = ((EntityID[]) getEntrancesOfRefuges().get(refugeIDs.get(0)).toArray())[0];
 				List<EntityID> path = search.getPath(me().getPosition(), dest, null);
 				path.add(refugeIDs.get(0));
 				if (path != null) {
@@ -375,4 +382,14 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 		return EnumSet.of(StandardEntityURN.AMBULANCE_TEAM);
 	}
 
+	public boolean blockadesBlockRoadTotally(int time) {
+		if (seenChanges.getTotallyBlockedRoad() != null) {
+			List<EntityID> path = randomWalkAroundCluster(null);
+			if (path != null) {
+				sendMove(time, path);
+				return true;
+			}
+		}
+		return false;
+	}
 }

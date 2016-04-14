@@ -84,9 +84,9 @@ public class AStar {
 			 Collection<EntityID> neighbours = graph.get(current.getId());
 			 for(EntityID id : neighbours) {
 				 StandardEntity entity = world.getEntity(id);
-				 if(entity instanceof Building)
+				 if((entity instanceof Building))
 					 continue;
-				 else if(entity instanceof Road){
+				 else if(entity instanceof Road ){
 					 if(blockadeRoads != null && blockadeRoads.contains(entity))
 						 continue;
 					 Road r = (Road)entity;
