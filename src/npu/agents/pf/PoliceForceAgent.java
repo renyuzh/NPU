@@ -322,7 +322,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		} else {
 			boolean traverslOk = traversalRoads(time);
 			if (!traverslOk) {
-				sendMove(time, randomWalkAroundCluster(roadsUnexplored));
+				sendMove(time, randomWalkAroundRoadsOnly(roadsUnexplored));
 			}
 			return;
 		}

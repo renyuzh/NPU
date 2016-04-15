@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import rescuecore2.standard.entities.FireBrigade;
 import rescuecore2.standard.entities.Human;
 import rescuecore2.standard.entities.Hydrant;
 import rescuecore2.standard.entities.Refuge;
+import rescuecore2.standard.entities.Road;
 import rescuecore2.standard.entities.StandardEntity;
 import rescuecore2.standard.entities.StandardEntityURN;
 import rescuecore2.standard.messages.AKSpeak;
@@ -37,21 +39,19 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	private Cluster cluster;
 	private Set<EntityID> buildingUnexplored = new HashSet<EntityID>();
 	private Set<Message> messagesWillSend = new HashSet<Message>();
-
-	private EntityID[] prePosition = new EntityID[2];
-	private EntityID nowPosition;
-
-	private Map<EntityID, Set<EntityID>> roadsAroundRefuge;
-	private List<EntityID> pathByPriotity;
 	private Set<EntityID> onFireBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID> warmBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID>  heatingBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID>  burningBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID>  InfernoBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID>  extinguishedBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID>  unburntBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID>  collaborationTasks = new HashSet<EntityID>();
-	private Set<EntityID> callForPFHelpTasks = new HashSet<EntityID>();
+/*	private Set<EntityID> warmBuildingsIDs = new HashSet<EntityID>();
+	private Set<EntityID> heatingBuildingsIDs = new HashSet<EntityID>();
+	private Set<EntityID> burningBuildingsIDs = new HashSet<EntityID>();
+	private Set<EntityID> InfernoBuildingsIDs = new HashSet<EntityID>();*/
+	private Set<EntityID> burnOutBuildingIDs = new HashSet<EntityID>();
+	private Set<EntityID> extinguishedBuildingsIDs = new HashSet<EntityID>();
+	private Set<EntityID> unburntBuildingsIDs = new HashSet<EntityID>();
+	private Set<EntityID> collaborationTasks = new HashSet<EntityID>();
+	private Set<EntityID> callForFBHelpTasks = new HashSet<EntityID>();
+	private Map<EntityID,Integer> distanceToHelp = new HashMap<EntityID,Integer>();
+	private Map<EntityID,Set<Integer>> distancesToHelpOfotherFBs = new HashMap<EntityID,Set<Integer>>();
+	//private Set<EntityID> fieryBuildingsNowCluster = new HashSet<EntityID>();
 	private int maxWater;
 	private int maxDistance;
 	private int maxPower;
@@ -94,16 +94,15 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		if (time == configuration.getIgnoreAgentCommand()) {
 			sendSubscribe(time, configuration.getFireChannel());// 注册了该通道的都可以接收到
 		}
-		
 		handleHeard(time, heard);
 		seenChanges.handleChanges(model, changes);
 		callOtherFBHelp(time);
 		addInjuredHumanInfoToMessageSend(time);
 		addRoadsInfoToMessageSend(time);
 		updateExtinguishedBuildings(time);
-		EntityID position = positionMeStuckedIn(seenChanges.getSeenBlockades(),me());
-		if(position != null) {
-			Message message = new Message(MessageID.FB_STUCKED,position,time,configuration.getPoliceChannel());
+		EntityID position = positionMeStuckedIn(seenChanges.getSeenBlockades(), me());
+		if (position != null) {
+			Message message = new Message(MessageID.FB_STUCKED, position, time, configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 			return;
 		}
@@ -111,59 +110,116 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 			handleBuriedMe(time);
 			return;
 		}
-/*		EntityID dest;
-		if (!onFireBuildings.isEmpty()) {
-			distanceSort(onFireBuildings,me());
-			dest = ((EntityID[]) buildingEntrances.get(onFireBuildings.get(0)).toArray())[0];
-			pathByPriotity = search.getPath(me().getPosition(), onFireBuildings.get(0), null);
-		} else if (!warmBuildings.isEmpty()) {
-			distanceSort(warmBuildings,me());
-			dest = ((EntityID[]) buildingEntrances.get(warmBuildings.get(0)).toArray())[0];
-			pathByPriotity = search.getPath(me().getPosition(), warmBuildings.get(0), null);
-		}*/
-		if (handleWater(time)) {
+		if (isFillingWater(time))
+			return;
+		if (roadBlockedTotally(time)) {
+			sendRest(time);
 			return;
 		}
-		for (EntityID next : seenChanges.getBuildingsOnFire()) {
-			if (model.getDistance(getID(), next) <= maxDistance) {
-				Logger.info("Extinguishing " + next);
-				sendExtinguish(time, next, maxPower);
-				sendSpeak(time, 1, ("Extinguishing " + next).getBytes());
-				return;
+		if (moveForWater(time)) {
+			return;
+		}
+		if (handleSeenFieryBuildings(time))
+			return;
+		if (handleHeardFieryBuildings(time)) {
+			return;
+		}
+		distancesToHelpOfotherFBs.clear();
+	/*	if (changeClusterToHelpOtherFB(time)) {
+			
+		}*/
+		List<EntityID> path = randomWalkAroundRoadsOnly(roadIDs);
+		sendMove(time, path);
+
+	}
+
+/*	private boolean changeClusterToHelpOtherFB(int time) {
+		if(seenChanges.getBuildingsOnFire() != null || )
+		return false;
+	}*/
+
+	private boolean handleHeardFieryBuildings(int time) {
+		for(EntityID destID: distancesToHelpOfotherFBs.keySet()) {
+			Set<EntityID> helps = distanceToHelp.keySet();
+			if(helps.isEmpty())
+				break;
+			if(!helps.isEmpty() && helps.contains(destID)) {
+				List<Integer> distances = new ArrayList<>(distancesToHelpOfotherFBs.get(destID));
+				Collections.sort(distances);
+				if(distances.get(1) >= distanceToHelp.get(destID)){
+					List<EntityID> path = search.getPath(me().getPosition(), destID, null);
+					if(path != null) {
+						distanceToHelp.clear();
+						Road road = (Road) model.getEntity(destID);
+						sendMove(time, path,road.getX(),road.getY());
+						return true;
+					}
+				}
+				
+			}
+			
+		}
+		distanceToHelp.clear();
+		boolean flag = false;
+		for(EntityID targetID : onFireBuildingsIDs) {
+			EntityID destID = ((EntityID[]) buildingEntrances.get(targetID).toArray())[0];
+			List<EntityID> path = search.getPath(me().getPosition(), destID,null);
+			if(path != null ){
+				int distance = getDistanceByPath(path,me());
+				Message message = new Message(MessageID.BUILDING_ON_FIRE,targetID,time,configuration.getFireChannel());
+				messagesWillSend.add(message);
+				distanceToHelp.put(targetID, distance);
+				flag = true;
 			}
 		}
-		// Plan a path to a fire
-		for (EntityID next : seenChanges.getBuildingsOnFire()) {
-			/*
-			 * List<EntityID> path = planPathToFire(next); if (path != null) {
-			 * Logger.info("Moving to target"); sendMove(time, path); return; }
-			 */
-		}
-		List<EntityID> path = null;
-		Logger.debug("Couldn't plan a path to a fire.");
-		/*
-		 * path = randomWalk(); Logger.info("Moving randomly"); sendMove(time,
-		 * path);
-		 */
+		return flag;
 	}
 
 	private void callOtherFBHelp(int time) {
 		Set<EntityID> otherFieryBuildingsIDs = seenChanges.getBuildingOnFireMore();
 		Set<EntityID> fieryWorseBuildingsIDS = seenChanges.getWorseStatusBuildings();
-		callForPFHelpTasks.addAll(otherFieryBuildingsIDs);
-		callForPFHelpTasks.addAll(fieryWorseBuildingsIDS);
-		for(EntityID id : callForPFHelpTasks) {
-			Message message = new Message(MessageID.FB_NEED_COLLABORATION,id,time,configuration.getFireChannel());
+		callForFBHelpTasks.addAll(otherFieryBuildingsIDs);
+		callForFBHelpTasks.addAll(fieryWorseBuildingsIDS);
+		for (EntityID id : callForFBHelpTasks) {
+			Message message = new Message(MessageID.FB_NEED_COLLABORATION, id, time, configuration.getFireChannel());
 			messagesWillSend.add(message);
 		}
 	}
+
+	private boolean handleSeenFieryBuildings(int time) {
+		if (me().getWater() == 0)
+			return false;
+		List<EntityID> fieryBuildingsIDs = new ArrayList<>(seenChanges.getBuildingsOnFire());
+		distanceSort(fieryBuildingsIDs, me());
+		for (EntityID next : fieryBuildingsIDs) {
+			if (model.getDistance(getID(), next) <= maxDistance) {
+				Logger.info("Extinguishing " + next);
+				sendExtinguish(time, next, Math.min(me().getWater(), maxPower));
+				sendSpeak(time, 1, ("Extinguishing " + next).getBytes());
+				return true;
+			} else {
+				EntityID destID = ((EntityID[]) buildingEntrances.get(next).toArray())[0];
+				List<EntityID> path = search.getPath(me().getPosition(), destID, null);
+				if (path != null) {
+					Road road = (Road) model.getEntity(destID);
+					sendMove(time, path,road.getX(),road.getY());
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	private void updateExtinguishedBuildings(int time) {
 		Set<EntityID> seenExtinguishedBuildingsIDs = seenChanges.getBuildingsExtinguished();
 		extinguishedBuildingsIDs.addAll(seenExtinguishedBuildingsIDs);
+		extinguishedBuildingsIDs.addAll(extinguishedBuildingsIDs);
+		extinguishedBuildingsIDs.addAll(burnOutBuildingIDs);
 		for (EntityID extinguishedBuildingID : extinguishedBuildingsIDs) {
-			heatingBuildingsIDs.remove(extinguishedBuildingID);
+			/*heatingBuildingsIDs.remove(extinguishedBuildingID);
 			burningBuildingsIDs.remove(extinguishedBuildingID);
-			InfernoBuildingsIDs.remove(extinguishedBuildingID);
+			InfernoBuildingsIDs.remove(extinguishedBuildingID);*/
+			onFireBuildingsIDs.remove(extinguishedBuildingID);
 		}
 	}
 
@@ -253,7 +309,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 
 	private void handleVoice(EntityID targetID, MessageID messageID) {
 		switch (messageID) {
-		case BUILDING_WARM:
+/*		case BUILDING_WARM:
 			warmBuildingsIDs.add(targetID);
 			break;
 		case BUILDING_HEATING:
@@ -264,6 +320,12 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 			break;
 		case BUILDING_INFERNO:
 			InfernoBuildingsIDs.add(targetID);
+			break;*/
+		case BUILDING_ON_FIRE:
+			
+		
+		case BUILDING_BURNT_OUT:
+			burnOutBuildingIDs.add(targetID);
 			break;
 		case BUILDING_EXTINGUISHED:
 			extinguishedBuildingsIDs.add(targetID);
@@ -281,7 +343,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 
 	private void handleRadio(EntityID targetID, MessageID messageID) {
 		switch (messageID) {
-		case BUILDING_WARM:
+/*		case BUILDING_WARM:
 			warmBuildingsIDs.add(targetID);
 			break;
 		case BUILDING_HEATING:
@@ -295,7 +357,9 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		case BUILDING_INFERNO:
 			InfernoBuildingsIDs.add(targetID);
 			onFireBuildingsIDs.add(targetID);
-			break;
+			break;*/
+		case BUILDING_ON_FIRE:
+		onFireBuildingsIDs.add(targetID);
 		case BUILDING_EXTINGUISHED:
 			extinguishedBuildingsIDs.add(targetID);
 			break;
@@ -317,25 +381,17 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		}
 	}
 
-	public boolean isStucked() {
-		if (prePosition[0] == prePosition[1] && prePosition[0] == nowPosition)
-			return true;
-		else
-			return false;
-	}
-
 	private boolean handleWater(int time) {
-		if (isfillingWater(time))
+		if (isFillingWater(time))
 			return true;
 		if (moveForWater(time))
 			return true;
 		return false;
 	}
 
-	private boolean isfillingWater(int time) {
+	private boolean isFillingWater(int time) {
 		if (me().isWaterDefined() && me().getWater() < maxWater
 				&& (location() instanceof Refuge || location() instanceof Hydrant)) {
-			Logger.info("Filling with water at " + location());
 			sendRest(time);
 			return true;
 		}
@@ -345,36 +401,30 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	public boolean moveForWater(int time) {
 		// Are we out of water?
 		if (me().isWaterDefined() && me().getWater() == 0) {
-			if (blockadesBlockRoadTotally(time)) {
-				return false;
-			}
 			List<EntityID> refugeIDs = new ArrayList<EntityID>(getEntrancesOfRefuges().keySet());
 			distanceSort(refugeIDs, me());
 			EntityID destRefugeID = ((EntityID[]) getEntrancesOfRefuges().get(refugeIDs.get(0)).toArray())[0];
 			List<EntityID> result = new ArrayList<EntityID>(hydrantIDs);
-			distanceSort(result,me());
+			distanceSort(result, me());
 			EntityID destHydrantID = result.get(0);
-			int distance1 = findDistanceTo(destRefugeID,me().getX(),me().getY());
-			int distance2 = findDistanceTo(destHydrantID,me().getX(),me().getY());
+			int distance1 = findDistanceTo(destRefugeID, me().getX(), me().getY());
+			int distance2 = findDistanceTo(destHydrantID, me().getX(), me().getY());
 			List path = null;
-			if(distance1 > distance2) {
+			if (distance1 > distance2) {
 				path = search.getPath(me().getPosition(), destHydrantID, null);
-			}else{
-				path = search.getPath(me().getPosition(), destRefugeID, null);
-				if(path != null)
-					path.add(refugeIDs.get(0));
-			}
-			// Head for a refuge
-			if (path != null) {
-				Logger.info("Moving to refuge or hydrant");
-				sendMove(time, path);
-				return true;
+				if (path != null) {
+					Hydrant hydrant = (Hydrant) model.getEntity(destHydrantID);
+					sendMove(time, path, hydrant.getX(), hydrant.getY());
+					return true;
+				}
 			} else {
-				Logger.debug("Couldn't plan a path to a refuge or hydrant");
-				path = randomWalkAroundCluster(roadsInCluster);
-				Logger.info("Moving randomly");
-				sendMove(time, path);
-				return true;
+				path = search.getPath(me().getPosition(), destRefugeID, null);
+				if (path != null) {
+					path.add(refugeIDs.get(0));
+					Refuge refuge = (Refuge) model.getEntity(refugeIDs.get(0));
+					sendMove(time, path, refuge.getX(), refuge.getY());
+					return true;
+				}
 			}
 		}
 		return false;
@@ -392,13 +442,13 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		System.out.println("fb of " + me().getID() + "is buried at time " + time);
 	}
 
-	public boolean blockadesBlockRoadTotally(int time) {
-		if (seenChanges.getTotallyBlockedRoad() != null) {
-			List<EntityID> path = randomWalkAroundCluster(roadsInCluster);
-			if (path != null) {
-				sendMove(time, path);
-				return true;
-			}
+	public boolean roadBlockedTotally(int time) {
+		Set<Road> totallyBlockedRoads = seenChanges.getTotallyBlockedRoad();
+		for (Road totallyBlockedRoad : totallyBlockedRoads) {
+			Message message = new Message(MessageID.ROAD_BLOCKED_TOTALLY, totallyBlockedRoad.getID(), time,
+					configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+			return true;
 		}
 		return false;
 	}

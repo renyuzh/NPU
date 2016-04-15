@@ -23,7 +23,7 @@ import rescuecore2.worldmodel.EntityID;
 public class ClustingMap {
 	private static List<Cluster> clusters;
 	private static boolean hasCompute = false;
-	private static Map<EntityID,Set<EntityID>> entrances= new HashMap<EntityID,Set<EntityID>>();
+	private static Map<EntityID,Set<EntityID>> buildingEntrances= new HashMap<EntityID,Set<EntityID>>();
 	/**
 	 * 将给定地图的建筑物聚类，并设置每簇周围的道路
 	 * 
@@ -120,10 +120,10 @@ public class ClustingMap {
 		return roads;
 	}
 	private static void setBuildingEntrance(Building building,Set<EntityID> roadsIDs) {
-		entrances.put(building.getID(), roadsIDs);
+		buildingEntrances.put(building.getID(), roadsIDs);
 	}
 	public static Map<EntityID,Set<EntityID>> getBuildingEntrances(){
-		return entrances;
+		return buildingEntrances;
 	}
 
 	/**

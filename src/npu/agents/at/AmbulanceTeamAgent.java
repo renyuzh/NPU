@@ -384,7 +384,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 
 	public boolean blockadesBlockRoadTotally(int time) {
 		if (seenChanges.getTotallyBlockedRoad() != null) {
-			List<EntityID> path = randomWalkAroundCluster(null);
+			List<EntityID> path = randomWalkAroundRoadsOnly(null);
 			if (path != null) {
 				sendMove(time, path);
 				return true;

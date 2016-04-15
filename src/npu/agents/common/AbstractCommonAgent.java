@@ -24,6 +24,7 @@ import rescuecore2.config.Config;
 import rescuecore2.connection.Connection;
 import rescuecore2.messages.Command;
 import rescuecore2.misc.Pair;
+import rescuecore2.misc.geometry.Point2D;
 import rescuecore2.standard.components.StandardAgent;
 import rescuecore2.standard.entities.Blockade;
 import rescuecore2.standard.entities.Building;
@@ -100,7 +101,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		seenChanges = new ChangeSetUtil();
 	}
 
-	protected List<EntityID> randomWalkAroundCluster(Set<EntityID> roadsID) {
+	protected List<EntityID> randomWalkAroundRoadsOnly(Set<EntityID> roadsID) {
 		List<EntityID> result = new ArrayList<EntityID>(RANDOM_WALK_LENGTH);
 		Set<EntityID> seen = new HashSet<EntityID>();
 		EntityID current = ((Human) me()).getPosition();
@@ -179,6 +180,16 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		return (int) Math.hypot(pair.first() - x, pair.second() - y);
 	}
 
+	protected int getDistanceByPath(List<EntityID> path,Human me) {
+		int distance = 0;
+		Pair<Integer,Integer> start =  new Pair(me.getX(),me.getY());
+		for(EntityID id: path) {
+			Pair<Integer, Integer> next = model.getEntity(id).getLocation(model);
+			distance += (int)Math.hypot(next.first()-start.first(), next.second() - start.second());
+			start = next;
+		}
+		return distance;
+	}
 	protected EntityID positionMeStuckedIn(Set<Blockade> seenBlockades, Human me) {
 		Set<Blockade> blockades = new HashSet<Blockade>();
 		for (Blockade blockade : seenBlockades) {
