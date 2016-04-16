@@ -31,25 +31,28 @@ import rescuecore2.worldmodel.EntityID;
 
 public class ChangeSetUtil {
 	private ArrayList<Building> buildings = new ArrayList<Building>();
-	private ArrayList<GasStation> gasStations = new ArrayList<GasStation>();
 
 	private ArrayList<Hydrant> hydrants = new ArrayList<Hydrant>();
 	private ArrayList<Road> roads = new ArrayList<Road>();
+	
 	private Set<Blockade> blockades = new HashSet<Blockade>();
 	private Set<EntityID> clearedRoadsIDs = new HashSet<EntityID>();
+	
 	private ArrayList<Civilian> civilians = new ArrayList<Civilian>();
 	private ArrayList<PoliceForce> policeForces = new ArrayList<PoliceForce>();
 	private ArrayList<FireBrigade> fireBrigades = new ArrayList<FireBrigade>();
 	private ArrayList<AmbulanceTeam> ambulanceTeams = new ArrayList<AmbulanceTeam>();
 	private ArrayList<Human> humans = new ArrayList<Human>();
 
-	// TODO 分析建筑，人类当前状态
 	private Set<EntityID> buildingsUnburnt = new HashSet<EntityID>();
-	private Set<EntityID> buildingsOnFire = new HashSet<EntityID>();
 	private Set<EntityID> buildingsIsWarm = new HashSet<EntityID>();
+	private Set<EntityID> buildingsOnFire = new HashSet<EntityID>();
 	private Set<EntityID> buildingsExtinguished = new HashSet<EntityID>();
+	private Set<EntityID> buildingsBurtout = new HashSet<EntityID>();
+	
 	private Map<EntityID, BuildingStatus> buildingStatusMap = new HashMap<EntityID, BuildingStatus>();
 	private Map<EntityID, BuildingStatus> preBuildingStatusMap;
+	
 	private Set<EntityID> worseStatusBuildings = new HashSet<EntityID>();
 	private int preCountFieryBuildings;
 	private int countOfFieryBuildings;
@@ -83,9 +86,6 @@ public class ChangeSetUtil {
 			case REFUGE:
 				refugeID = standardEntity.getID();
 				break;
-			case GAS_STATION:
-				gasStations.add((GasStation) standardEntity);
-				break;
 			case ROAD:
 				roads.add((Road) standardEntity);
 				break;
@@ -118,6 +118,7 @@ public class ChangeSetUtil {
 	}
 
 	public void analyzeBuildings() {
+		System.out.print("");
 		for (Building building : buildings) {
 			BuildingStatus buildingStatus = new BuildingStatus(building, building.getFierynessEnum());
 			if (buildingStatus.isWarm()) {
@@ -140,10 +141,12 @@ public class ChangeSetUtil {
 			}
 			if (isBuildingStatusWorse(building)) {
 				worseStatusBuildings.add(building.getID());
+				System.out.print(building.getID()+" building worse ");
 			}
 			if (buildingStatus.isOnFire()) {
 				buildingsOnFire.add(building.getID());
 				countOfFieryBuildings++;
+				System.out.print(building.getID()+" building on Fire ");
 			} else {
 				buildingsOnFire.remove(building.getID());
 			}
@@ -186,17 +189,7 @@ public class ChangeSetUtil {
 		return false;
 	}
 
-	public Set<Human> getBuriedHuman() {
-		return humanBuried;
-	}
 
-	public Set<Human> getInjuredHuman() {
-		return humanInjured;
-	}
-
-	public Set<Blockade> getSeenBlockades() {
-		return blockades;
-	}
 
 	public Set<Blockade> getBlockadesHumanStuckedIn() {
 		Set<Blockade> blockades = new HashSet<Blockade>();
@@ -216,9 +209,7 @@ public class ChangeSetUtil {
 		return blockades;
 	}
 
-	public EntityID getRefugeID() {
-		return refugeID;
-	}
+
 
 	public Set<Blockade> getSeenBlockadesAroundRefuge(Map<EntityID, Set<EntityID>> map) {
 		if (refugeID != null) {
@@ -230,69 +221,8 @@ public class ChangeSetUtil {
 		return blockadesAroundRefuge;
 	}
 
-	public Set<EntityID> getBuildingOnFireMore() {
-		if (preCountFieryBuildings < countOfFieryBuildings)
-			return buildingsOnFire;
-		return null;
-	}
 
-	public Set<EntityID> getBuildingsUnburnt() {
-		return buildingsUnburnt;
-	}
 
-	public Set<EntityID> getClearedRoads() {
-		return clearedRoadsIDs;
-	}
-
-	public Set<EntityID> getBuildingsIsWarm() {
-		return buildingsIsWarm;
-	}
-
-	public Set<EntityID> getBuildingsExtinguished() {
-		return buildingsExtinguished;
-	}
-
-	public Set<EntityID> getBuildingsOnFire() {
-		return buildingsOnFire;
-	}
-
-	public Set<EntityID> getBuildingsHeating() {
-		return buildingsHeating;
-	}
-
-	public Set<EntityID> getBuildingsBurning() {
-		return buildingsBurning;
-	}
-
-	public Set<EntityID> getBuildingsInferno() {
-		return buildingsInferno;
-	}
-
-	public void previousChangesClear() {
-		gasStations.clear();
-
-		hydrants.clear();
-		roads.clear();
-		blockades.clear();
-
-		civilians.clear();
-		policeForces.clear();
-		fireBrigades.clear();
-		ambulanceTeams.clear();
-
-		blockadesAroundRefuge.clear();
-		refugeID = null;
-
-		buildingsUnburnt.clear();
-		buildingsIsWarm.clear();
-		buildingsExtinguished.clear();
-	    buildingsOnFire.clear();
-		humanBuried.clear();
-
-		buildingStatusMap.clear();
-		worseStatusBuildings.clear();
-		countOfFieryBuildings = 0;
-	}
 
 	public boolean isBlocked(EntityID lastPosition, Human me, double lastPositionX, double lastPositionY) {
 		return (lastPosition != null && lastPosition.getValue() == me.getPosition().getValue()
@@ -474,5 +404,84 @@ public class ChangeSetUtil {
 				return neighbourEdge;
 		}
 		return null;
+	}
+	public void previousChangesClear() {
+		System.out.println("clear pre seenChanges");
+		
+		//TODO 这些到底是每次清空还是保存部分再更新
+		hydrants.clear();
+		roads.clear();
+		blockades.clear();
+
+		civilians.clear();
+		policeForces.clear();
+		fireBrigades.clear();
+		ambulanceTeams.clear();
+
+		blockadesAroundRefuge.clear();
+		refugeID = null;
+		buildingsUnburnt.clear();
+		buildingsIsWarm.clear();
+		buildingsExtinguished.clear();
+	    buildingsOnFire.clear();
+		humanBuried.clear();
+
+		buildingStatusMap.clear();
+		worseStatusBuildings.clear();
+		countOfFieryBuildings = 0;
+	}
+	public Set<EntityID> getBuildingOnFireMore() {
+		if (preCountFieryBuildings < countOfFieryBuildings)
+			return buildingsOnFire;
+		return null;
+	}
+
+	public Set<EntityID> getBuildingsUnburnt() {
+		return buildingsUnburnt;
+	}
+
+	public Set<EntityID> getBuildingBurtOut() {
+		return buildingsBurtout;
+	}
+	public Set<EntityID> getClearedRoads() {
+		return clearedRoadsIDs;
+	}
+
+	public Set<EntityID> getBuildingsIsWarm() {
+		return buildingsIsWarm;
+	}
+
+	public Set<EntityID> getBuildingsExtinguished() {
+		return buildingsExtinguished;
+	}
+
+	public Set<EntityID> getBuildingsOnFire() {
+		return buildingsOnFire;
+	}
+
+	public Set<EntityID> getBuildingsHeating() {
+		return buildingsHeating;
+	}
+
+	public Set<EntityID> getBuildingsBurning() {
+		return buildingsBurning;
+	}
+
+	public Set<EntityID> getBuildingsInferno() {
+		return buildingsInferno;
+	}
+	public Set<Human> getBuriedHuman() {
+		return humanBuried;
+	}
+
+	public Set<Human> getInjuredHuman() {
+		return humanInjured;
+	}
+
+	public Set<Blockade> getSeenBlockades() {
+		return blockades;
+	}
+	public EntityID getRefugeID() {
+		return refugeID;
 	}
 }

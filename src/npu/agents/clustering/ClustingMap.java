@@ -6,10 +6,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 import npu.agents.utils.Point;
 import rescuecore2.log.Logger;
+import rescuecore2.misc.Pair;
 import rescuecore2.misc.geometry.GeometryTools2D;
 import rescuecore2.standard.entities.Building;
 import rescuecore2.standard.entities.Human;
@@ -23,7 +25,8 @@ import rescuecore2.worldmodel.EntityID;
 public class ClustingMap {
 	private static List<Cluster> clusters;
 	private static boolean hasCompute = false;
-	private static Map<EntityID,Set<EntityID>> buildingEntrances= new HashMap<EntityID,Set<EntityID>>();
+	private static Map<EntityID, Set<EntityID>> buildingEntrances = new HashMap<EntityID, Set<EntityID>>();
+
 	/**
 	 * 将给定地图的建筑物聚类，并设置每簇周围的道路
 	 * 
@@ -34,78 +37,46 @@ public class ClustingMap {
 	public static void initMap(int k, int iterTimes, StandardWorldModel model) {
 		if (!hasCompute) {
 			clustingBuildings(k, iterTimes, model);
-			setRoadAroundCluster(model);
-			setRoadAroundRefugesInCluster(model);
+			setRoadsInCluster(model);
+			setRefugesEntrances(model);
 			hasCompute = true;
 		}
 	}
 
 	private static void clustingBuildings(int k, int iterTimes, StandardWorldModel model) {
-		Logger.info("ClusteringBuidings");
+		System.out.println("clustingBuildings");
 		List<Point> allPoints = new ArrayList<Point>();
 		Collection<StandardEntity> buildings = model.getEntitiesOfType(StandardEntityURN.BUILDING,
-				StandardEntityURN.REFUGE);
+				StandardEntityURN.REFUGE, StandardEntityURN.POLICE_OFFICE, StandardEntityURN.AMBULANCE_CENTRE,
+				StandardEntityURN.FIRE_STATION, StandardEntityURN.GAS_STATION);
 		for (StandardEntity next : buildings) {
 			Building building = (Building) next;
 			Point point = new Point(building.getX(), building.getY());
 			point.setId(building.getID());
-			/*
-			 * point.setCanPass(false); Set<Point> neighbours =
-			 * getNeighbours(building,model); point.setNeighbours(neighbours);
-			 */
-			if(!allPoints.contains(point))
+			if (!allPoints.contains(point)) {
 				allPoints.add(point);
+				setBuildingsEntrances(building,model);
+			}
 		}
 		clusters = KMeans.getClusters(k, iterTimes, allPoints);
 	}
 
-	private static void setRoadAroundCluster(StandardWorldModel model) {
-		Logger.info("setRoadAroundCluster");
-		for (Cluster cluster : clusters) {
-			Set<EntityID> roads = new HashSet<EntityID>();
-			List<Point> members = cluster.getMembers();
-			for (Point member : members) {
-				StandardEntity entity = model.getEntity(member.getId());
-				Set<EntityID> r = getRoadAroundBuilding((Building) entity, model);
-				setBuildingEntrance((Building) entity,r);
-				roads.addAll(r);
-			}
-			/*
-			 * Iterator<EntityID> iter = roads.iterator(); double minDistance =
-			 * Double.MAX_VALUE; Road closest = null; while(iter.hasNext()) {
-			 * EntityID r = iter.next(); model.getEntity(r) double distance =
-			 * GeometryTools2D.getDistance(cluster.getCenterPoint(),new
-			 * Point(r.getX(),r.getY())); if(distance < minDistance) {
-			 * minDistance = distance; closest = r; } }
-			 */
-			cluster.setRoadsAroundCluster(roads);
-			// cluster.setClosestRoadAroundCenter(closest);
-		}
-	}
-
-	private static void setRoadAroundRefugesInCluster(StandardWorldModel model) {
-		Set<EntityID> roads = new HashSet<EntityID>();
-		EntityID refugeID = null;
-		for (Cluster cluster : clusters) {
-			List<Point> members = cluster.getMembers();
-			for (Point member : members) {
-				StandardEntity entity = model.getEntity(member.getId());
-				if (entity instanceof Refuge) {
-					Refuge refuge = (Refuge) entity;
-					for (EntityID id : refuge.getNeighbours()) {
-						StandardEntity nearEntity = model.getEntity(id);
-						if (nearEntity instanceof Road) {
-							roads.add(nearEntity.getID());
-							refugeID = refuge.getID();
-						}
-					}
-				}
-				if (refugeID != null) {
-					cluster.setRoadAroudRefuge(refugeID, roads);
-					refugeID = null;
-					roads.clear();
+	private static void setRoadsInCluster(StandardWorldModel model) {
+		System.out.println("setRoadsInCluster");
+		for (StandardEntity road : model.getEntitiesOfType(StandardEntityURN.ROAD)) {
+			int MIN_DISTANCE = Integer.MAX_VALUE;
+			int j = new Random(clusters.size()).nextInt();
+			for (int i = 0; i < clusters.size(); i++) {
+				Cluster cluster = clusters.get(i);
+				Point center = cluster.getCenterPoint();
+				Pair<Integer, Integer> next = road.getLocation(model);
+				int distance = (int) Math.hypot(next.first() - center.getX(), next.second() - center.getY());
+				if (distance < MIN_DISTANCE) {
+					MIN_DISTANCE = distance;
+					j = i;
 				}
 			}
+			clusters.get(j).setRoadsInCluster(road.getID());
 		}
 	}
 
@@ -119,13 +90,42 @@ public class ClustingMap {
 		}
 		return roads;
 	}
-	private static void setBuildingEntrance(Building building,Set<EntityID> roadsIDs) {
-		buildingEntrances.put(building.getID(), roadsIDs);
+
+	private static void setBuildingsEntrances(Building building, StandardWorldModel model) {
+		Set<EntityID> roadsIDs = getRoadAroundBuilding(building, model);
+		if (!buildingEntrances.keySet().contains(building.getID()))
+			buildingEntrances.put(building.getID(), roadsIDs);
 	}
-	public static Map<EntityID,Set<EntityID>> getBuildingEntrances(){
+
+	public static Map<EntityID, Set<EntityID>> getBuildingEntrances() {
 		return buildingEntrances;
 	}
 
+	private static void setRefugesEntrances(StandardWorldModel model) {
+		for(Cluster cluster: clusters) {
+		   for(EntityID building : cluster.getBuildingsIDs()) {
+			   StandardEntity entity = model.getEntity(building);
+			   if(entity instanceof Refuge) {
+				   Refuge refuge = (Refuge)entity;
+				   Set<EntityID> roads = new HashSet<EntityID>();
+				   EntityID refugeID = null;
+				   for (EntityID id : refuge.getNeighbours()) {
+						StandardEntity nearEntity = model.getEntity(id);
+						if (nearEntity instanceof Road) {
+							roads.add(nearEntity.getID());
+							refugeID = refuge.getID();
+						}
+					}
+				   if (refugeID != null) {
+						cluster.setRoadAroudRefuge(refugeID, roads);
+						System.out.println("set roads of refuge in cluster"+refugeID);
+						refugeID = null;
+						roads.clear();
+					}
+			   }
+		   }
+		}
+	}
 	/**
 	 * 将Agent分给指定的簇
 	 * 
@@ -170,33 +170,5 @@ public class ClustingMap {
 
 	public static List<Cluster> getClusters() {
 		return clusters;
-	}
-
-	/**
-	 * 获得当前坐标点附近坐标点
-	 * 
-	 * @param building
-	 * @param model
-	 * @return
-	 */
-	private static Set<Point> getNeighbours(Building building, StandardWorldModel model) {
-		Set<Point> neighbours = new HashSet<Point>();
-		for (EntityID id : building.getNeighbours()) {
-			StandardEntity entity = model.getEntity(id);
-			Point point = null;
-			if (entity instanceof Building) {
-				point = new Point(((Building) entity).getX(), ((Building) entity).getY());
-				point.setId(((Building) entity).getID());
-				point.setCanPass(false);
-			}
-			if (entity instanceof Road) {
-				point = new Point(((Road) entity).getX(), ((Road) entity).getY());
-				point.setId(((Road) entity).getID());
-				point.setCanPass(true);
-			}
-			if (point != null)
-				neighbours.add(point);
-		}
-		return neighbours;
 	}
 }

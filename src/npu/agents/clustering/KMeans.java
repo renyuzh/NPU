@@ -51,7 +51,7 @@ public class KMeans {
 		Set<Point> centerPoints = new HashSet<Point>();
 		for(int i = 0;i < originClusters.size();i++) {
 			Cluster cluster = originClusters.get(i);
-			List<Point> allPoints = cluster.getMembers();
+			List<Point> allPoints = new ArrayList<>(cluster.getMembers());
 			int size = allPoints.size();
 			if(size < 3) {
 				centerPoints.add(cluster.getCenterPoint());

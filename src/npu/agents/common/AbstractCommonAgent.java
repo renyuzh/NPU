@@ -13,18 +13,13 @@ import java.util.Set;
 
 import npu.agents.clustering.Cluster;
 import npu.agents.clustering.ClustingMap;
+import npu.agents.communication.model.Message;
 import npu.agents.communication.utils.ChangeSetUtil;
 import npu.agents.communication.utils.ConfigUtil;
+import npu.agents.communication.utils.CommUtils.MessageID;
 import npu.agents.pf.strategy.ClearUtil;
 import npu.agents.search.AStar;
-import npu.agents.utils.KConstants;
-import npu.agents.utils.Point;
-//import npu.agents.utils.SampleSearch;
-import rescuecore2.config.Config;
-import rescuecore2.connection.Connection;
-import rescuecore2.messages.Command;
 import rescuecore2.misc.Pair;
-import rescuecore2.misc.geometry.Point2D;
 import rescuecore2.standard.components.StandardAgent;
 import rescuecore2.standard.entities.Blockade;
 import rescuecore2.standard.entities.Building;
@@ -33,9 +28,6 @@ import rescuecore2.standard.entities.Hydrant;
 import rescuecore2.standard.entities.Refuge;
 import rescuecore2.standard.entities.Road;
 import rescuecore2.standard.entities.StandardEntity;
-import rescuecore2.standard.entities.StandardEntityURN;
-import rescuecore2.worldmodel.ChangeSet;
-import rescuecore2.worldmodel.Entity;
 import rescuecore2.worldmodel.EntityID;
 
 public abstract class AbstractCommonAgent<E extends StandardEntity> extends StandardAgent<E> {
@@ -68,6 +60,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 
 	protected ClearUtil clearUtil;
 	protected ChangeSetUtil seenChanges;
+	protected Set<Message> messagesWillSend = new HashSet<Message>();
 
 	private Map<EntityID, Set<EntityID>> entrancesOfRefuges;
 
@@ -100,7 +93,70 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		clearUtil = new ClearUtil();
 		seenChanges = new ChangeSetUtil();
 	}
+	protected void callForATHelp(int time,MessageID messageID) {
+		Message message = new Message(messageID, me().getID(), time, configuration.getAmbulanceChannel());
+		messagesWillSend.add(message);
+		sendRest(time);
+		System.out.println(messageID.name()+ " of " + me().getID() + " at " + time);
+	}
+	protected void addBuildingInfoToMessageSend(int time) {
+	/*	for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
+			Message message = new Message(MessageID.BUILDING_UNBURNT, unburntBuidingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}*/
+		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
+			System.out.println("send warm building message");
+			Message message = new Message(MessageID.BUILDING_WARM, warmBuidingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID onFireBuildingID : seenChanges.getBuildingsOnFire()) {
+			System.out.println("send on fire building message");
+			Message message = new Message(MessageID.BUILDING_ON_FIRE, onFireBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID extinguishBuildingID : seenChanges.getBuildingsExtinguished()) {
+			System.out.println("send extinguished building message");
+			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, extinguishBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for(EntityID burtOutBuildingID : seenChanges.getBuildingBurtOut()) {
+			System.out.println("send burtOut building message");
+			Message message = new Message(MessageID.BUILDING_BURNT_OUT,burtOutBuildingID,time,configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+	}
 
+	protected void addInjuredHumanInfoToMessageSend(int time) {
+		for (Human human : seenChanges.getBuriedHuman()) {
+			Message message = new Message(MessageID.HUMAN_BURIED, human.getPosition(), time,
+					configuration.getAmbulanceChannel());
+			if(human.getID() != me().getID())
+			messagesWillSend.add(message);
+		}
+	}
+    protected void sendMessages(int time) {
+    	sendAllVoiceMessages(time);
+		sendAllRadioMessages(time);
+    }
+	private void sendAllRadioMessages(int time) {
+		for (Message message : messagesWillSend) {
+			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
+			sendSpeak(time, message.getChannel(), data.getBytes());
+		}
+		messagesWillSend.clear();
+	}
+
+	private void sendAllVoiceMessages(int time) {
+		for (Message message : messagesWillSend) {
+			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
+			sendSpeak(time, message.getChannel(), data.getBytes());
+		}
+		messagesWillSend.clear();
+	}
 	protected List<EntityID> randomWalkAroundRoadsOnly(Set<EntityID> roadsID) {
 		List<EntityID> result = new ArrayList<EntityID>(RANDOM_WALK_LENGTH);
 		Set<EntityID> seen = new HashSet<EntityID>();
@@ -190,7 +246,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		}
 		return distance;
 	}
-	protected EntityID positionMeStuckedIn(Set<Blockade> seenBlockades, Human me) {
+	protected EntityID positionWhereIStuckedIn(Set<Blockade> seenBlockades, Human me) {
 		Set<Blockade> blockades = new HashSet<Blockade>();
 		for (Blockade blockade : seenBlockades) {
 			ArrayList<Integer> X = new ArrayList<Integer>();

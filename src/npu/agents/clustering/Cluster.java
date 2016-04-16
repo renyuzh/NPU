@@ -13,8 +13,8 @@ import rescuecore2.worldmodel.EntityID;
 
 public class Cluster {
 	private Point centerPoint;
-	private List<Point> members = new ArrayList<Point>();
-	private Set<EntityID> roadsAroundCluster;
+	private Set<Point> members = new HashSet<Point>();
+	private Set<EntityID> roadsInCluster = new HashSet<EntityID>();
 	private EntityID agentID;
 	private Road closestRoadAroundCenter;
 	private Map<EntityID,Set<EntityID>> roadAroundRefuge = new HashMap<EntityID,Set<EntityID>>();
@@ -34,11 +34,11 @@ public class Cluster {
 		this.centerPoint = centerPoint;
 	}
 	public void addMember(Point member) {
-		if(!members.contains(member)&& member.getId()!=null)
+		if(member.getId()!=null)
 			members.add(member);
 	}
-	public void setRoadsAroundCluster(Set<EntityID> roadsAroundCluster) {
-		this.roadsAroundCluster = roadsAroundCluster;
+	public void setRoadsInCluster(EntityID roadID) {
+		roadsInCluster.add(roadID);
 	}
 	public void setRoadAroudRefuge(EntityID refugeID,Set<EntityID> roadsID) {
 		this.roadAroundRefuge.put(refugeID, roadsID);
@@ -49,17 +49,17 @@ public class Cluster {
 	public void setCenterPoint(Point centerPoint) {
 		this.centerPoint = centerPoint;
 	}
-	public Set<EntityID> getRoadsAroundCluster() {
-		return roadsAroundCluster;
+	public Set<EntityID> getRoadsInCluster() {
+		return roadsInCluster;
 	}
 	public Map<EntityID,Set<EntityID>> getRoadARoundRefuge() {
 		return roadAroundRefuge;
 	}
-	public List<Point> getMembers() {
+	public Set<Point> getMembers() {
 		return members;
 	}
-	public Set<EntityID> getMembersID() {
-		List<Point> points = this.getMembers();
+	public Set<EntityID> getBuildingsIDs() {
+		List<Point> points = new ArrayList<Point>(getMembers());
 		Set<EntityID> ids = new HashSet<EntityID>();
 		for(Point  point : points) {
 			ids.add(point.getId());
