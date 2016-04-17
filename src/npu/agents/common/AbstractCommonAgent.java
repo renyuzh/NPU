@@ -1,26 +1,18 @@
 package npu.agents.common;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import npu.agents.clustering.Cluster;
-import npu.agents.clustering.ClustingMap;
-import npu.agents.communication.model.Message;
-import npu.agents.communication.utils.ChangeSetUtil;
 import npu.agents.communication.utils.ConfigUtil;
-import npu.agents.communication.utils.CommUtils.MessageID;
 import npu.agents.search.AStar;
-import rescuecore2.log.Logger;
 import rescuecore2.misc.Pair;
 import rescuecore2.standard.components.StandardAgent;
+import rescuecore2.standard.entities.Area;
 import rescuecore2.standard.entities.Blockade;
 import rescuecore2.standard.entities.Building;
 import rescuecore2.standard.entities.Human;
@@ -55,11 +47,12 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 	 * Cache of hydrant IDs
 	 */
 	protected Set<EntityID> hydrantIDs;
-
+    
+	protected Set<EntityID> areaIDs;
 	protected Map<EntityID, Set<EntityID>> neighbours;
 
-	protected ChangeSetUtil seenChanges;
-	protected Set<Message> messagesWillSend = new HashSet<Message>();
+	/*protected ChangeSetUtil seenChanges;
+	protected Set<Message> messagesWillSend = new HashSet<Message>();*/
 
 	private Map<EntityID, Set<EntityID>> entrancesOfRefuges;
 
@@ -70,11 +63,14 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		roadIDs = new HashSet<EntityID>();
 		refuges = new HashSet<Refuge>();
 		hydrantIDs = new HashSet<EntityID>();
+		areaIDs = new HashSet<EntityID>();
 		ArrayList<EntityID> test = new ArrayList<EntityID>();
 		for (StandardEntity next : model) {
+			if(next instanceof Area){
+				areaIDs.add(next.getID());
+			}
 			if (next instanceof Building) {
 				buildingIDs.add(next.getID());
-				test.add(next.getID());
 			}
 			if (next instanceof Road) {
 				roadIDs.add(next.getID());
@@ -89,10 +85,10 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		search = new AStar(model);
 		neighbours = search.getGraph();
 		configuration = new ConfigUtil(config);
-		seenChanges = new ChangeSetUtil();
+		/*seenChanges = new ChangeSetUtil();*/
 	}
 
-	protected void callForATHelp(int time, MessageID messageID) {
+/*	protected void callForATHelp(int time, MessageID messageID) {
 		Message message = new Message(messageID, me().getID(), time, configuration.getAmbulanceChannel());
 		messagesWillSend.add(message);
 		sendRest(time);
@@ -116,15 +112,15 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 			}
 		}
 		return false;
-	}
+	}*/
 
-	protected void addBuildingInfoToMessageSend(int time) {
-		/*
+	/*protected void addBuildingInfoToMessageSend(int time) {
+		
 		 * for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
 		 * Message message = new Message(MessageID.BUILDING_UNBURNT,
 		 * unburntBuidingID, time, configuration.getFireChannel());
 		 * messagesWillSend.add(message); }
-		 */
+		 
 		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
 			System.out.println("send warm building message");
 			Message message = new Message(MessageID.BUILDING_WARM, warmBuidingID, time, configuration.getFireChannel());
@@ -163,9 +159,9 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 			if (human.getID() != me().getID())
 				messagesWillSend.add(message);
 		}
-	}
+	}*/
 
-	public void addRoadsInfoToMessageSend(int time) {
+	/*public void addRoadsInfoToMessageSend(int time) {
 		for (Blockade blockade : seenChanges.getSeenBlockades()) {
 			Message message = new Message(MessageID.PLATOON_BLOCKED, blockade.getID(), time,
 					configuration.getPoliceChannel());
@@ -186,9 +182,9 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 			Message message = new Message(MessageID.ROAD_CLEARED, roadID, time, configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 		}
-	}
+	}*/
 
-	protected void sendMessages(int time) {
+/*	protected void sendMessages(int time) {
 		sendAllVoiceMessages(time);
 		sendAllRadioMessages(time);
 	}
@@ -207,7 +203,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 			sendSpeak(time, message.getChannel(), data.getBytes());
 		}
 		messagesWillSend.clear();
-	}
+	}*/
 
 	protected List<EntityID> randomWalk(Set<EntityID> ids) {
 		List<EntityID> result = new ArrayList<EntityID>(RANDOM_WALK_LENGTH);

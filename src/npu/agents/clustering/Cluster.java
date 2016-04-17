@@ -85,7 +85,8 @@ public class Cluster {
 		List<Point> points = new ArrayList<Point>(getMembers());
 		Set<EntityID> ids = new HashSet<EntityID>();
 		for (Point point : points) {
-			ids.add(point.getId());
+			if(point.getId() != null)
+				ids.add(point.getId());
 		}
 		return ids;
 	}

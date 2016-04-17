@@ -26,6 +26,7 @@ import rescuecore2.misc.geometry.Vector2D;
 import rescuecore2.standard.entities.Area;
 import rescuecore2.standard.entities.Blockade;
 import rescuecore2.standard.entities.Civilian;
+import rescuecore2.standard.entities.Human;
 import rescuecore2.standard.entities.PoliceForce;
 import rescuecore2.standard.entities.Refuge;
 import rescuecore2.standard.entities.Road;
@@ -50,11 +51,16 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	private Map<EntityID, Set<EntityID>> refugesEntrancesMap;
 	private List<EntityID> pathByPriotity;
 
+	public ChangeSetUtil seenChanges;
+	public Set<Message> messagesWillSend = new HashSet<Message>();
+	
+	private EntityID[] prePosition = new EntityID[2];
+	private EntityID nowPosition;
 	@Override
-	protected void postConnect() {
+	public void postConnect() {
 		super.postConnect();
 		try {
-			ClustingMap.initMap(KConstants.countOfpf, 100, model);
+			ClustingMap.initMap(Math.min(KConstants.countOfpf,configuration.getPoliceForcesCount()), 100, model);
 			cluster = ClustingMap.assignAgentToCluster(me(), model);
 			if (cluster == null) {
 				System.out.println("该agent没有分配到cluster");
@@ -65,14 +71,16 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			roadsUnexplored = cluster.getRoadsInCluster();
 			refugesEntrancesMap = cluster.getRoadARoundRefuge();
 			distance = configuration.getMaxCleardistance();
+			seenChanges = new ChangeSetUtil();
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("聚类失败");
+			return;
 		}
 	}
 
 	@Override
-	protected void think(int time, ChangeSet changes, Collection<Command> heard) {
+	public void think(int time, ChangeSet changes, Collection<Command> heard) {
 		if (time < configuration.getIgnoreAgentCommand())
 			return;
 		handleReceiveMessages(time, changes, heard);
@@ -133,6 +141,9 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		 * if (clearBlockadesAroundRefuge(time, seenChanges)) { return; } else {
 		 */
 		basicClear(time, seenChanges);
+		if(somethingWrong(time)) {
+			return;
+		}
 		// }
 	}
 
@@ -399,8 +410,116 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	}
 
 	@Override
-	protected EnumSet<StandardEntityURN> getRequestedEntityURNsEnum() {
+	public EnumSet<StandardEntityURN> getRequestedEntityURNsEnum() {
 		return EnumSet.of(StandardEntityURN.POLICE_FORCE);
 	}
+	public void callForATHelp(int time, MessageID messageID) {
+		Message message = new Message(messageID, me().getID(), time, configuration.getAmbulanceChannel());
+		messagesWillSend.add(message);
+		sendRest(time);
+		System.out.println(messageID.name() + " of " + me().getID() + " at " + time);
+	}
 
+	public boolean canMoveToRefuge(int time, Human me, Map<EntityID, Set<EntityID>> refugesEntrancesMap) {
+		Set<EntityID> refugeIDsInCluster = refugesEntrancesMap.keySet();
+		if (!refugeIDsInCluster.isEmpty()) {
+			List<EntityID> refugeIDs = new ArrayList<EntityID>(refugeIDsInCluster);
+			distanceSort(refugeIDs, me);
+			EntityID dest = ((EntityID[]) getEntrancesOfRefuges().get(refugeIDs.get(0)).toArray())[0];
+			List<EntityID> path = search.getPath(me.getPosition(), dest, null);
+			path.add(refugeIDs.get(0));
+			if (path != null) {
+				Refuge refuge = (Refuge) model.getEntity(refugeIDs.get(0));
+				Logger.info("Moving to refuge");
+				sendMove(time, path, refuge.getX(), refuge.getY());
+				System.out.println(me().getID() + "of at move to refuge for damage");
+				return true;
+			}
+		}
+		return false;
+	}
+	public void addBuildingInfoToMessageSend(int time) {
+		/*
+		 * for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
+		 * Message message = new Message(MessageID.BUILDING_UNBURNT,
+		 * unburntBuidingID, time, configuration.getFireChannel());
+		 * messagesWillSend.add(message); }
+		 */
+		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
+			System.out.println("send warm building message");
+			Message message = new Message(MessageID.BUILDING_WARM, warmBuidingID, time, configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID onFireBuildingID : seenChanges.getBuildingsOnFire()) {
+			System.out.println("send on fire building message");
+			Message message = new Message(MessageID.BUILDING_ON_FIRE, onFireBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID extinguishBuildingID : seenChanges.getBuildingsExtinguished()) {
+			System.out.println("send extinguished building message");
+			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, extinguishBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID burtOutBuildingID : seenChanges.getBuildingBurtOut()) {
+			System.out.println("send burtOut building message");
+			Message message = new Message(MessageID.BUILDING_BURNT_OUT, burtOutBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+	}
+
+	public void addInjuredHumanInfoToMessageSend(int time) {
+		for (Human human : seenChanges.getBuriedPlatoons()) {
+			Message message = new Message(MessageID.PLATOON_BURIED, human.getPosition(), time,
+					configuration.getAmbulanceChannel());
+			if (human.getID() != me().getID())
+				messagesWillSend.add(message);
+		}
+		for (Human human : seenChanges.getInjuredCivilians()) {
+			Message message = new Message(MessageID.CIVILIAN_INJURED, human.getPosition(), time,
+					configuration.getAmbulanceChannel());
+			if (human.getID() != me().getID())
+				messagesWillSend.add(message);
+		}
+	}
+	public void sendMessages(int time) {
+		sendAllVoiceMessages(time);
+		sendAllRadioMessages(time);
+	}
+
+	private void sendAllRadioMessages(int time) {
+		for (Message message : messagesWillSend) {
+			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
+			sendSpeak(time, message.getChannel(), data.getBytes());
+		}
+		messagesWillSend.clear();
+	}
+
+	private void sendAllVoiceMessages(int time) {
+		for (Message message : messagesWillSend) {
+			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
+			sendSpeak(time, message.getChannel(), data.getBytes());
+		}
+		messagesWillSend.clear();
+	}
+	private boolean somethingWrong(int time){
+		prePosition[1] = prePosition[0];
+		prePosition[0] = nowPosition;
+		nowPosition = me().getPosition();
+		if(prePosition[0] != null && prePosition[1] != null &&  nowPosition != null
+				&& nowPosition.equals(prePosition[0])&& prePosition[0].equals(prePosition[1]))
+		{
+			List<EntityID> path = randomWalk(areaIDs);
+			if(path != null) {
+				sendMove(time, path);
+				System.out.println("something is wrong for fb of "+ me().getID());
+				prePosition[0] =null;
+				prePosition[1] = null;
+			  nowPosition = null;
+			}
+		}
+			return false;
+	}
 }

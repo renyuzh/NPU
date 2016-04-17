@@ -32,7 +32,7 @@ import rescuecore2.standard.entities.StandardWorldModel;
 import rescuecore2.worldmodel.ChangeSet;
 import rescuecore2.worldmodel.EntityID;
 
-public class ChangeSetUtil {
+public   class ChangeSetUtil {
 	private ArrayList<Building> buildings = new ArrayList<Building>();
 
 	private ArrayList<Hydrant> hydrants = new ArrayList<Hydrant>();
@@ -71,11 +71,11 @@ public class ChangeSetUtil {
 
 	private StandardWorldModel world;
 
-	public Set<EntityID> getWorseStatusBuildings() {
+	public synchronized  Set<EntityID> getWorseStatusBuildings() {
 		return worseStatusBuildings;
 	}
 
-	public void handleChanges(StandardWorldModel model, ChangeSet changes) {
+	public synchronized  void handleChanges(StandardWorldModel model, ChangeSet changes) {
 		previousChangesClear();
 		world = model;
 		Set<EntityID> seenIDs = changes.getChangedEntities();
@@ -120,7 +120,7 @@ public class ChangeSetUtil {
 		analyzeHumans();
 	}
 
-	public void analyzeBuildings() {
+	public synchronized  void analyzeBuildings() {
 		System.out.print("");
 		for (Building building : buildings) {
 			BuildingStatus buildingStatus = new BuildingStatus(building, building.getFierynessEnum());
@@ -159,7 +159,7 @@ public class ChangeSetUtil {
 		preCountFieryBuildings = countOfFieryBuildings;
 	}
 
-	public void analyzeRoads() {
+	public synchronized  void analyzeRoads() {
 		for (Road road : roads) {
 			if (road.isBlockadesDefined() && road.getBlockades().isEmpty()) {
 				clearedRoadsIDs.add(road.getID());
@@ -169,7 +169,7 @@ public class ChangeSetUtil {
 		}
 	}
 
-	public void analyzeHumans() {
+	public synchronized  void analyzeHumans() {
 		for (Human human : humans) {
 			if (human instanceof Civilian && human.isHPDefined() && human.isDamageDefined()
 					&& human.isBuriednessDefined() && human.isPositionDefined() && human.getHP() > 0
@@ -185,7 +185,7 @@ public class ChangeSetUtil {
 
 	}
 
-	public boolean isBuildingStatusWorse(Building building) {
+	public synchronized  boolean isBuildingStatusWorse(Building building) {
 		if (preBuildingStatusMap != null && preBuildingStatusMap.keySet().contains(building.getID())) {
 			BuildingStatus preStatus = preBuildingStatusMap.get(building.getID());
 			if (preStatus.getFieryness() < building.getFieryness())
@@ -194,7 +194,7 @@ public class ChangeSetUtil {
 		return false;
 	}
 
-	public Set<Blockade> getBlockadesHumanStuckedIn() {
+	public synchronized  Set<Blockade> getBlockadesHumanStuckedIn() {
 		Set<Blockade> blockades = new HashSet<Blockade>();
 		for (Blockade blockade : getSeenBlockades()) {
 			ArrayList<Integer> X = new ArrayList<Integer>();
@@ -213,19 +213,19 @@ public class ChangeSetUtil {
 	}
 
 	/*
-	 * public Set<Blockade> getSeenBlockadesAroundRefuge(Map<EntityID,
+	 * public synchronized  Set<Blockade> getSeenBlockadesAroundRefuge(Map<EntityID,
 	 * Set<EntityID>> map) { if (refugeID != null) { for (Blockade blockade :
 	 * getSeenBlockades()) { if (map.keySet().contains(refugeID) &&
 	 * map.get(refugeID).contains(blockade.getPosition()))
 	 * blockadesAroundRefuge.add(blockade); } } return blockadesAroundRefuge; }
 	 */
 
-	public boolean isBlocked(EntityID lastPosition, Human me, double lastPositionX, double lastPositionY) {
+	public synchronized  boolean isBlocked(EntityID lastPosition, Human me, double lastPositionX, double lastPositionY) {
 		return (lastPosition != null && lastPosition.getValue() == me.getPosition().getValue()
 				&& Math.hypot(Math.abs(me.getX() - lastPositionX), Math.abs(me.getY() - lastPositionY)) < 8000);
 	}
 
-	public boolean in_or_out_of_polygon(ArrayList<Integer> X, ArrayList<Integer> Y, int x, int y) {
+	public synchronized  boolean in_or_out_of_polygon(ArrayList<Integer> X, ArrayList<Integer> Y, int x, int y) {
 		int i, j;
 		boolean c = false;
 		for (i = 0, j = X.size() - 1; i < X.size(); j = i++) {
@@ -239,7 +239,7 @@ public class ChangeSetUtil {
 	/**
 	 * gets the seen blockades on a certain road from the changeSet
 	 */
-	public List<Blockade> getSeenBlockadesOnRoad(Road road) {
+	public synchronized  List<Blockade> getSeenBlockadesOnRoad(Road road) {
 		List<Blockade> blockadesOnRoad = new ArrayList<Blockade>();
 		for (Blockade b : getSeenBlockades()) {
 			if (b.getPosition().getValue() == road.getID().getValue())
@@ -248,7 +248,7 @@ public class ChangeSetUtil {
 		return blockadesOnRoad;
 	}
 
-	public Set<Road> getTotallyBlockedRoad() {
+	public synchronized  Set<Road> getTotallyBlockedRoad() {
 		Set<Road> blockedRoads = new HashSet<Road>();
 		for (Road r : roads) {
 			if (isBlockingRoadTotally(r)) {
@@ -258,7 +258,7 @@ public class ChangeSetUtil {
 		return blockedRoads;
 	}
 
-	public boolean isBlockingRoadTotally(Road road) {
+	public synchronized  boolean isBlockingRoadTotally(Road road) {
 		List<Blockade> blockadesOnRoad = getSeenBlockadesOnRoad(road);
 		for (Blockade blockade : blockadesOnRoad) {
 			int[] vertices = mergeAdjacentBlockades(blockade, blockadesOnRoad, 2000);
@@ -278,7 +278,7 @@ public class ChangeSetUtil {
 	 * for the adjacent blockades to the original blockade then merge them
 	 * together
 	 */
-	public int[] mergeAdjacentBlockades(Blockade originalBlockade, List<Blockade> otherBlockades, int threshold) {
+	public synchronized  int[] mergeAdjacentBlockades(Blockade originalBlockade, List<Blockade> otherBlockades, int threshold) {
 		List<Integer> verticesList = new ArrayList<Integer>();
 		int[] blockadeVertices = originalBlockade.getApexes();
 
@@ -326,14 +326,14 @@ public class ChangeSetUtil {
 		return vertices;
 	}
 
-	public List<Integer> mergeVertices(List<Integer> list, int[] array) {
+	public synchronized  List<Integer> mergeVertices(List<Integer> list, int[] array) {
 		for (int i = 0; i < array.length; i++) {
 			list.add(array[i]);
 		}
 		return list;
 	}
 
-	public boolean openRoadEdge(Road road, Edge roadEdge, int[] blockadeVertices, int threshold) {
+	public synchronized  boolean openRoadEdge(Road road, Edge roadEdge, int[] blockadeVertices, int threshold) {
 		double minDistanceStart = Double.POSITIVE_INFINITY;
 		double minDistanceEnd = Double.POSITIVE_INFINITY;
 		Line2D roadEdgeLine = roadEdge.getLine();
@@ -393,7 +393,7 @@ public class ChangeSetUtil {
 		return false;
 	}
 
-	public Edge getNeighbourEdge(Road road, Edge roadEdge) {
+	public synchronized  Edge getNeighbourEdge(Road road, Edge roadEdge) {
 		Area neighbour = (Area) world.getEntity(roadEdge.getNeighbour());
 		for (Edge neighbourEdge : neighbour.getEdges()) {
 			if (neighbourEdge.isPassable() && neighbourEdge.getNeighbour().getValue() == road.getID().getValue())
@@ -402,7 +402,7 @@ public class ChangeSetUtil {
 		return null;
 	}
 
-	public void previousChangesClear() {
+	public synchronized  void previousChangesClear() {
 		System.out.println("clear pre seenChanges");
 
 		// TODO 这些到底是每次清空还是保存部分再更新
@@ -438,68 +438,68 @@ public class ChangeSetUtil {
 		roadsNeedToClear.clear();
 	}
 
-	public Set<EntityID> getBuildingOnFireMore() {
+	public synchronized  Set<EntityID> getBuildingOnFireMore() {
 		if (preCountFieryBuildings < countOfFieryBuildings)
 			return buildingsOnFire;
 		return null;
 	}
 
-	public Set<EntityID> getBuildingsUnburnt() {
+	public synchronized  Set<EntityID> getBuildingsUnburnt() {
 		return buildingsUnburnt;
 	}
 
-	public Set<EntityID> getBuildingBurtOut() {
+	public synchronized  Set<EntityID> getBuildingBurtOut() {
 		return buildingsBurtout;
 	}
 
-	public Set<EntityID> getClearedRoads() {
+	public synchronized  Set<EntityID> getClearedRoads() {
 		return clearedRoadsIDs;
 	}
 
-	public Set<EntityID> getBuildingsIsWarm() {
+	public synchronized  Set<EntityID> getBuildingsIsWarm() {
 		return buildingsIsWarm;
 	}
 
-	public Set<EntityID> getBuildingsExtinguished() {
+	public synchronized  Set<EntityID> getBuildingsExtinguished() {
 		return buildingsExtinguished;
 	}
 
-	public Set<EntityID> getBuildingsOnFire() {
+	public synchronized  Set<EntityID> getBuildingsOnFire() {
 		return buildingsOnFire;
 	}
 
-	public Set<EntityID> getBuildingsHeating() {
+	public synchronized  Set<EntityID> getBuildingsHeating() {
 		return buildingsHeating;
 	}
 
-	public Set<EntityID> getBuildingsBurning() {
+	public synchronized  Set<EntityID> getBuildingsBurning() {
 		return buildingsBurning;
 	}
 
-	public Set<EntityID> getBuildingsInferno() {
+	public synchronized  Set<EntityID> getBuildingsInferno() {
 		return buildingsInferno;
 	}
 
-	public Set<Human> getInjuredCivilians() {
+	public synchronized  Set<Human> getInjuredCivilians() {
 		return civilianInjured;
 	}
 
-	public Set<Human> getBuriedPlatoons() {
+	public synchronized  Set<Human> getBuriedPlatoons() {
 		return platoonBuried;
 	}
 
-	public Set<Human> getInjuredHumans() {
+	public synchronized  Set<Human> getInjuredHumans() {
 		Set<Human> humans = new HashSet<Human>();
 		humans.addAll(getInjuredCivilians());
 		humans.addAll(getBuriedPlatoons());
 		return humans;
 	}
 
-	public Set<Blockade> getSeenBlockades() {
+	public synchronized  Set<Blockade> getSeenBlockades() {
 		return blockades;
 	}
 
-	public EntityID getRefugeID() {
+	public synchronized  EntityID getRefugeID() {
 		return refugeID;
 	}
 }

@@ -46,6 +46,16 @@ public final class LaunchAgents {
 		try {
 			int i = 1;
 			try {
+				while (at != 0) {
+					launcher.connect(new AmbulanceTeamAgent());
+					at--;
+					System.out.println("Success: 成功连接第" + (i++) + "个AmbulanceTeamAgent");
+				}
+			} catch (ComponentConnectionException e) {
+				System.out.println("Failed: 连接第" + i + "个AmbulanceTeamAgent时失败");
+			}
+			i = 1;
+			try {
 				while (fb != 0) {
 					launcher.connect(new FireBrigadeAgent());
 					fb--;
@@ -54,7 +64,7 @@ public final class LaunchAgents {
 			} catch (ComponentConnectionException e) {
 				System.out.println("Failed: 连接第" + i + "个FireBrigade时失败");
 			}
-			i = 1;
+			 i = 1;
 			try {
 				while (pf != 0) {
 					launcher.connect(new PoliceForceAgent());
@@ -63,16 +73,6 @@ public final class LaunchAgents {
 				}
 			} catch (ComponentConnectionException e) {
 				System.out.println("Failed: 连接第" + i + "个PoliceForceAgent时失败");
-			}
-			i = 1;
-			try {
-				while (at != 0) {
-					launcher.connect(new AmbulanceTeamAgent());
-					at--;
-					System.out.println("Success: 成功连接第" + (i++) + "个AmbulanceTeamAgent");
-				}
-			} catch (ComponentConnectionException e) {
-				System.out.println("Failed: 连接第" + i + "个AmbulanceTeamAgent时失败");
 			}
 			i = 1;
 			try {

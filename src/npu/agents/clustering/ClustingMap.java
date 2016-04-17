@@ -24,7 +24,7 @@ import rescuecore2.worldmodel.EntityID;
 
 public class ClustingMap {
 	private static List<Cluster> clusters;
-	private static boolean hasCompute = false;
+	public static boolean hasCompute = false;
 	private static Map<EntityID, Set<EntityID>> buildingEntrances = new HashMap<EntityID, Set<EntityID>>();
 
 	/**
@@ -34,8 +34,9 @@ public class ClustingMap {
 	 * @param iterTimes
 	 * @param model
 	 */
-	public static void initMap(int k, int iterTimes, StandardWorldModel model) {
+	public  static synchronized void initMap(int k, int iterTimes, StandardWorldModel model) {
 		if (!hasCompute) {
+			buildingEntrances.clear();
 			clustingBuildings(k, iterTimes, model);
 			setRoadsInCluster(model);
 			setRefugesAndBuildingsEntrances(model);
@@ -43,7 +44,7 @@ public class ClustingMap {
 		}
 	}
 
-	private static void clustingBuildings(int k, int iterTimes, StandardWorldModel model) {
+	private  static synchronized void clustingBuildings(int k, int iterTimes, StandardWorldModel model) {
 		System.out.println("clustingBuildings");
 		List<Point> allPoints = new ArrayList<Point>();
 		Collection<StandardEntity> buildings = model.getEntitiesOfType(StandardEntityURN.BUILDING,
@@ -58,10 +59,10 @@ public class ClustingMap {
 				// setBuildingsEntrances(building, model);
 			}
 		}
-		clusters = KMeans.getClusters(k, iterTimes, allPoints);
+		clusters = new KMeans().getClusters(k, iterTimes, allPoints);;
 	}
 
-	private static void setRoadsInCluster(StandardWorldModel model) {
+	private  static synchronized void setRoadsInCluster(StandardWorldModel model) {
 		System.out.println("setRoadsInCluster");
 		for (StandardEntity road : model.getEntitiesOfType(StandardEntityURN.ROAD)) {
 			int MIN_DISTANCE = Integer.MAX_VALUE;
@@ -80,7 +81,7 @@ public class ClustingMap {
 		}
 	}
 
-	private static Set<EntityID> getRoadAroundBuilding(Building building, StandardWorldModel model) {
+	private  static synchronized Set<EntityID> getRoadAroundBuilding(Building building, StandardWorldModel model) {
 		Set<EntityID> roads = new HashSet<EntityID>();
 		for (EntityID id : building.getNeighbours()) {
 			StandardEntity entity = model.getEntity(id);
@@ -91,17 +92,17 @@ public class ClustingMap {
 		return roads;
 	}
 
-	private static void setBuildingsEntrances(Building building, StandardWorldModel model) {
+	private  static synchronized void setBuildingsEntrances(Building building, StandardWorldModel model) {
 		Set<EntityID> roadsIDs = getRoadAroundBuilding(building, model);
 		if (!buildingEntrances.keySet().contains(building.getID()))
 			buildingEntrances.put(building.getID(), roadsIDs);
 	}
 
-	public static Map<EntityID, Set<EntityID>> getBuildingEntrances() {
+	public  static synchronized Map<EntityID, Set<EntityID>> getBuildingEntrances() {
 		return buildingEntrances;
 	}
 
-	private static void setRefugesAndBuildingsEntrances(StandardWorldModel model) {
+	private  static synchronized void setRefugesAndBuildingsEntrances(StandardWorldModel model) {
 		Set<EntityID> templist = new HashSet<EntityID>();
 		EntityID entityID = null;
 		for (Cluster cluster : clusters) {
@@ -118,7 +119,7 @@ public class ClustingMap {
 					}
 					if (entityID != null) {
 						cluster.setRoadAroudRefuge(entityID, templist);
-						System.out.println("set roads of refuge in cluster" + entityID);
+						System.out.println("set roads of refuge in cluster for " + entityID);
 						entityID = null;
 						templist.clear();
 					}
@@ -133,7 +134,7 @@ public class ClustingMap {
 					}
 					if (entityID != null) {
 						cluster.setBuildingsEntrances(entityID, templist);
-						System.out.println("set roads of building in cluster" + entityID);
+						System.out.println("set roads of building in cluster of " +cluster.getCenterPoint().getId()+ "for "+entityID);
 						entityID = null;
 						templist.clear();
 					}
@@ -150,7 +151,7 @@ public class ClustingMap {
 	 * @throws Exception
 	 *             地图聚类失败
 	 */
-	public static Cluster assignAgentToCluster(Human human, StandardWorldModel model) throws Exception {
+	public  static synchronized Cluster assignAgentToCluster(Human human, StandardWorldModel model) throws Exception {
 		if (clusters == null) {
 			throw new Exception();
 		}
@@ -158,9 +159,14 @@ public class ClustingMap {
 		Double minDistance = Double.MAX_VALUE;
 		int j = -1;
 		Point source = new Point(human.getX(), human.getY());
+		System.out.println(clusters.size()+" pf of "+human.getID());
 		for (int i = 0; i < clusters.size(); i++) {
-			if (clusters.get(i).getAgentID() != null)
+			if (clusters.get(i).getAgentID() != null){
+				System.out.println(human.getID()+" of pf:" +clusters.get(i).getAgentID());
 				continue;
+			}else{
+				System.out.println(human.getID()+" of pf: cluster has no agent" );
+			}
 			Double distance = GeometryTools2D.getDistance(source, clusters.get(i).getCenterPoint());
 			if (distance < minDistance) {
 				minDistance = distance;
@@ -171,10 +177,11 @@ public class ClustingMap {
 			clusters.get(j).setAgentID(human.getID());
 			return clusters.get(j);
 		}
+		System.out.println(j+"oh shit of pf of "+human.getID());
 		return null;
 	}
 
-	public static Cluster getClusterByAgentID(EntityID id) {
+	public  static synchronized Cluster getClusterByAgentID(EntityID id) {
 		for (int i = 0; i < clusters.size(); i++) {
 			Cluster cluster = clusters.get(i);
 			if (cluster.getAgentID() != null && cluster.getAgentID().equals(id)) {
@@ -184,7 +191,7 @@ public class ClustingMap {
 		return null;
 	}
 
-	public static List<Cluster> getClusters() {
+	public  static synchronized List<Cluster> getClusters() {
 		return clusters;
 	}
 }

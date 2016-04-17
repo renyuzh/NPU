@@ -12,14 +12,18 @@ import java.util.Set;
 
 import npu.agents.clustering.Cluster;
 import npu.agents.clustering.ClustingMap;
+import npu.agents.clustering.ClustingMap2;
 import npu.agents.common.AbstractCommonAgent;
 import npu.agents.communication.model.Message;
+import npu.agents.communication.utils.ChangeSetUtil;
 import npu.agents.communication.utils.CommUtils.MessageID;
 import npu.agents.utils.KConstants;
 import rescuecore2.log.Logger;
 import rescuecore2.messages.Command;
+import rescuecore2.standard.entities.Blockade;
 import rescuecore2.standard.entities.Civilian;
 import rescuecore2.standard.entities.FireBrigade;
+import rescuecore2.standard.entities.Human;
 import rescuecore2.standard.entities.Hydrant;
 import rescuecore2.standard.entities.Refuge;
 import rescuecore2.standard.entities.Road;
@@ -53,13 +57,17 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	private Set<EntityID> roadsInCluster;
 	private Map<EntityID, Set<EntityID>> buildingEntrances;
 	private Map<EntityID, Set<EntityID>> refugesEntrancesMap;
+	private EntityID[] prePosition = new EntityID[2];
+	private EntityID nowPosition;
+	
+	public ChangeSetUtil seenChanges;
 
 	@Override
-	protected void postConnect() {
+	public void postConnect() {
 		super.postConnect();
 		try {
-			ClustingMap.initMap(KConstants.countOfpf, 100, model);
-			cluster = ClustingMap.assignAgentToCluster(me(), model);
+			ClustingMap2.initMap(Math.min(KConstants.countOffb,configuration.getAmbulanceTeamsCount()), 100, model);
+			cluster = ClustingMap2.assignAgentToCluster(me(), model);
 			if (cluster == null) {
 				System.out.println("该agent没有分配到cluster");
 				return;
@@ -67,6 +75,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("聚类失败");
+			return;
 		}
 		buildingUnexplored = cluster.getBuildingsIDs();
 		roadsInCluster = cluster.getRoadsInCluster();
@@ -75,11 +84,12 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		maxPower = configuration.getMaxFirePower();
 		buildingEntrances = ClustingMap.getBuildingEntrances();
 		refugesEntrancesMap = cluster.getRoadARoundRefuge();
+		seenChanges = new ChangeSetUtil();
 
 	}
 
 	@Override
-	protected void think(int time, ChangeSet changes, Collection<Command> heard) {
+	public void think(int time, ChangeSet changes, Collection<Command> heard) {
 		if (time < configuration.getIgnoreAgentCommand())
 			return;
 		handleReceiveMessages(time, changes, heard);
@@ -102,6 +112,8 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		addInjuredHumanInfoToMessageSend(time);
 		addRoadsInfoToMessageSend(time);
 		updateExtinguishedBuildings(time);
+		if (somethingWrong(time)){
+		}
 		EntityID position = positionWhereIStuckedIn(seenChanges.getSeenBlockades(), me());
 		if (position != null) {
 			Message message = new Message(MessageID.PLATOON_STUCKED, position, time, configuration.getPoliceChannel());
@@ -187,8 +199,12 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	private void callOtherFBHelp(int time) {
 		Set<EntityID> otherFieryBuildingsIDs = seenChanges.getBuildingOnFireMore();
 		Set<EntityID> fieryWorseBuildingsIDS = seenChanges.getWorseStatusBuildings();
-		callForFBHelpTasks.addAll(otherFieryBuildingsIDs);
-		callForFBHelpTasks.addAll(fieryWorseBuildingsIDS);
+		if(otherFieryBuildingsIDs != null ){
+			callForFBHelpTasks.addAll(otherFieryBuildingsIDs);
+		}
+		if(fieryWorseBuildingsIDS != null) {
+			callForFBHelpTasks.addAll(fieryWorseBuildingsIDS);
+		}
 		for (EntityID id : callForFBHelpTasks) {
 			Message message = new Message(MessageID.FB_NEED_COLLABORATION, id, time, configuration.getFireChannel());
 			messagesWillSend.add(message);
@@ -286,7 +302,8 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		 * BUILDING_INFERNO: InfernoBuildingsIDs.add(targetID); break;
 		 */
 		case BUILDING_ON_FIRE:
-
+			onFireBuildingsIDs.add(targetID);
+			break;
 		case BUILDING_BURNT_OUT:
 			burnOutBuildingIDs.add(targetID);
 			break;
@@ -387,15 +404,8 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	}
 
 	@Override
-	protected EnumSet<StandardEntityURN> getRequestedEntityURNsEnum() {
-		return EnumSet.of(StandardEntityURN.AMBULANCE_TEAM);
-	}
-
-	public void handleBuriedMe(int time) {
-		Message message = new Message(MessageID.FB_BURIED, me().getID(), time, configuration.getAmbulanceChannel());
-		messagesWillSend.add(message);
-		sendRest(time);
-		System.out.println("fb of " + me().getID() + "is buried at time " + time);
+	public EnumSet<StandardEntityURN> getRequestedEntityURNsEnum() {
+		return EnumSet.of(StandardEntityURN.FIRE_BRIGADE);
 	}
 
 	public boolean roadBlockedTotally(int time) {
@@ -407,5 +417,136 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 			return true;
 		}
 		return false;
+	}
+	public void callForATHelp(int time, MessageID messageID) {
+		Message message = new Message(messageID, me().getID(), time, configuration.getAmbulanceChannel());
+		messagesWillSend.add(message);
+		sendRest(time);
+		System.out.println(messageID.name() + " of " + me().getID() + " at " + time);
+	}
+
+	public boolean canMoveToRefuge(int time, Human me, Map<EntityID, Set<EntityID>> refugesEntrancesMap) {
+		Set<EntityID> refugeIDsInCluster = refugesEntrancesMap.keySet();
+		if (!refugeIDsInCluster.isEmpty()) {
+			List<EntityID> refugeIDs = new ArrayList<EntityID>(refugeIDsInCluster);
+			distanceSort(refugeIDs, me);
+			EntityID dest = ((EntityID[]) getEntrancesOfRefuges().get(refugeIDs.get(0)).toArray())[0];
+			List<EntityID> path = search.getPath(me.getPosition(), dest, null);
+			path.add(refugeIDs.get(0));
+			if (path != null) {
+				Refuge refuge = (Refuge) model.getEntity(refugeIDs.get(0));
+				Logger.info("Moving to refuge");
+				sendMove(time, path, refuge.getX(), refuge.getY());
+				System.out.println(me().getID() + "of at move to refuge for damage");
+				return true;
+			}
+		}
+		return false;
+	}
+	public void addBuildingInfoToMessageSend(int time) {
+		/*
+		 * for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
+		 * Message message = new Message(MessageID.BUILDING_UNBURNT,
+		 * unburntBuidingID, time, configuration.getFireChannel());
+		 * messagesWillSend.add(message); }
+		 */
+		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
+			System.out.println("send warm building message");
+			Message message = new Message(MessageID.BUILDING_WARM, warmBuidingID, time, configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID onFireBuildingID : seenChanges.getBuildingsOnFire()) {
+			System.out.println("send on fire building message");
+			Message message = new Message(MessageID.BUILDING_ON_FIRE, onFireBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID extinguishBuildingID : seenChanges.getBuildingsExtinguished()) {
+			System.out.println("send extinguished building message");
+			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, extinguishBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID burtOutBuildingID : seenChanges.getBuildingBurtOut()) {
+			System.out.println("send burtOut building message");
+			Message message = new Message(MessageID.BUILDING_BURNT_OUT, burtOutBuildingID, time,
+					configuration.getFireChannel());
+			messagesWillSend.add(message);
+		}
+	}
+
+	public void addInjuredHumanInfoToMessageSend(int time) {
+		for (Human human : seenChanges.getBuriedPlatoons()) {
+			Message message = new Message(MessageID.PLATOON_BURIED, human.getPosition(), time,
+					configuration.getAmbulanceChannel());
+			if (human.getID() != me().getID())
+				messagesWillSend.add(message);
+		}
+		for (Human human : seenChanges.getInjuredCivilians()) {
+			Message message = new Message(MessageID.CIVILIAN_INJURED, human.getPosition(), time,
+					configuration.getAmbulanceChannel());
+			if (human.getID() != me().getID())
+				messagesWillSend.add(message);
+		}
+	}
+	public void sendMessages(int time) {
+		sendAllVoiceMessages(time);
+		sendAllRadioMessages(time);
+	}
+
+	private void sendAllRadioMessages(int time) {
+		for (Message message : messagesWillSend) {
+			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
+			sendSpeak(time, message.getChannel(), data.getBytes());
+		}
+		messagesWillSend.clear();
+	}
+
+	private void sendAllVoiceMessages(int time) {
+		for (Message message : messagesWillSend) {
+			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
+			sendSpeak(time, message.getChannel(), data.getBytes());
+		}
+		messagesWillSend.clear();
+	}
+	public void addRoadsInfoToMessageSend(int time) {
+		for (Blockade blockade : seenChanges.getSeenBlockades()) {
+			Message message = new Message(MessageID.PLATOON_BLOCKED, blockade.getID(), time,
+					configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+		}
+		for (Road road : seenChanges.getTotallyBlockedRoad()) {
+			Message message = new Message(MessageID.ROAD_BLOCKED_TOTALLY, road.getID(), time,
+					configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+		}
+
+		for (Blockade blockadeStuckedHuman : seenChanges.getBlockadesHumanStuckedIn()) {
+			Message message = new Message(MessageID.HUMAN_STUCKED, blockadeStuckedHuman.getPosition(), time,
+					configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID roadID : seenChanges.getClearedRoads()) {
+			Message message = new Message(MessageID.ROAD_CLEARED, roadID, time, configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+		}
+	}
+	private boolean somethingWrong(int time){
+		prePosition[1] = prePosition[0];
+		prePosition[0] = nowPosition;
+		nowPosition = me().getPosition();
+		if(prePosition[0] != null && prePosition[1] != null &&  nowPosition != null
+				&& nowPosition.equals(prePosition[0])&& prePosition[0].equals(prePosition[1]))
+		{
+			List<EntityID> path = randomWalk(areaIDs);
+			if(path != null) {
+				sendMove(time, path);
+				System.out.println("something is wrong for fb of "+ me().getID());
+				prePosition[0] =null;
+				prePosition[1] = null;
+			  nowPosition = null;
+			}
+		}
+			return false;
 	}
 }

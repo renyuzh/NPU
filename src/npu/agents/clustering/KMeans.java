@@ -20,7 +20,7 @@ public class KMeans {
 	 *            需要聚类的数据点
 	 * @return
 	 */
-	public static List<Cluster> getClusters(int k, int iterTimes, List<Point> allPoints) {
+	public  List<Cluster> getClusters(int k, int iterTimes, List<Point> allPoints) {
 		Set<Point> firstCenters = initFirstCenters(k, allPoints);
 		List<Cluster> firstClustersCount = prepareClustersCount(firstCenters);
 		List<Cluster> firstClusters = addEachPointTocluster(firstCenters, firstClustersCount, allPoints);
@@ -35,7 +35,7 @@ public class KMeans {
 	 * @param allPoints
 	 * @return
 	 */
-	private static Set<Point> initFirstCenters(int k, List<Point> allPoints) {
+	private  Set<Point> initFirstCenters(int k, List<Point> allPoints) {
 		System.out.println("initFirstCenters");
 		Set<Point> centers = new HashSet<Point>();
 		Random random = new Random();
@@ -44,6 +44,7 @@ public class KMeans {
 			seed = random.nextInt(allPoints.size());
 			centers.add(allPoints.get(seed));
 		}
+		System.out.println("init centers "+centers.size());
 		return centers;
 	}
 
@@ -53,25 +54,29 @@ public class KMeans {
 	 * @param originClusters
 	 * @return
 	 */
-	private static Set<Point> updateCenters(List<Cluster> originClusters) {
+	private  Set<Point> updateCenters(List<Cluster> originClusters,List<Point> allPoints) {
 		System.out.println("updateCenters");
+		System.out.println(originClusters.size()+"originClusterSize");
 		Set<Point> centerPoints = new HashSet<Point>();
 		for (int i = 0; i < originClusters.size(); i++) {
 			Cluster cluster = originClusters.get(i);
-			List<Point> allPoints = new ArrayList<>(cluster.getMembers());
-			int size = allPoints.size();
-			if (size < 3) {
-				centerPoints.add(cluster.getCenterPoint());
-				break;
-			}
+			List<Point> pointsInCluster = new ArrayList<>(cluster.getMembers());
+			int size = pointsInCluster.size();
 			double x = 0.0, y = 0.0;
 			for (int j = 0; j < size; j++) {
-				x += allPoints.get(j).getX();
-				y += allPoints.get(j).getY();
+				x += pointsInCluster.get(j).getX();
+				y += pointsInCluster.get(j).getY();
 			}
 			Point newCenter = new Point(x / size, y / size);
+			int seed = 0;
+		    while(centerPoints.contains(newCenter)){
+		    	seed = new Random().nextInt(allPoints.size());
+				newCenter = allPoints.get(seed);
+			}
+			//很大可能会出现相同的中心点，这样以来就可能分得比指定K少的簇
 			centerPoints.add(newCenter);
 		}
+		System.out.println(centerPoints.size()+"update centerPoints");
 		return centerPoints;
 	}
 
@@ -82,7 +87,7 @@ public class KMeans {
 	 * @param allPoints
 	 * @return
 	 */
-	private static List<Cluster> updateCenterToPoint(List<Cluster> clusters, List<Point> allPoints) {
+	private  List<Cluster> updateCenterToPoint(List<Cluster> clusters, List<Point> allPoints) {
 		System.out.println("updateCenterToPoint");
 		for (Cluster cluster : clusters) {
 			double minDistance = Double.MAX_VALUE;
@@ -114,7 +119,7 @@ public class KMeans {
 	 * @param centerPoints
 	 * @return
 	 */
-	private static List<Cluster> prepareClustersCount(Set<Point> centerPoints) {
+	private  List<Cluster> prepareClustersCount(Set<Point> centerPoints) {
 		System.out.println("prepareClustersCount");
 		List<Cluster> clusters = new ArrayList<Cluster>();
 		Iterator<Point> iter = centerPoints.iterator();
@@ -126,6 +131,7 @@ public class KMeans {
 			}
 			clusters.add(cluster);
 		}
+		System.out.println("prepareClustersCount "+clusters.size());
 		return clusters;
 	}
 
@@ -137,7 +143,7 @@ public class KMeans {
 	 * @param allPoints
 	 * @return
 	 */
-	private static List<Cluster> addEachPointTocluster(Set<Point> centerPoints, List<Cluster> clusters,
+	private  List<Cluster> addEachPointTocluster(Set<Point> centerPoints, List<Cluster> clusters,
 			List<Point> allPoints) {
 		System.out.println("addEachPointTocluster");
 		Point[] centers = centerPoints.toArray(new Point[0]);
@@ -167,6 +173,7 @@ public class KMeans {
 				}
 			}
 		}
+		System.out.println("addEachPointTocluster "+clusters.size());
 		return clusters;
 	}
 
@@ -178,17 +185,18 @@ public class KMeans {
 	 * @param allPoints
 	 * @return
 	 */
-	private static List<Cluster> updateClusters(List<Cluster> clusters, int iterTimes, List<Point> allPoints) {
+	private  List<Cluster> updateClusters(List<Cluster> clusters, int iterTimes, List<Point> allPoints) {
 		System.out.println("updateClusters");
 		Set<Point> lastCenterPoints = new HashSet<Point>();
 		for (int times = 0; times < iterTimes; times++) {
 			System.out.print(times);
-			Set<Point> centerPoints = updateCenters(clusters);
+			Set<Point> centerPoints = updateCenters(clusters,allPoints);
 			if (lastCenterPoints.containsAll(centerPoints))
 				break;
 			lastCenterPoints = centerPoints;
 			clusters = addEachPointTocluster(centerPoints, prepareClustersCount(centerPoints), allPoints);
 		}
+		System.out.println(clusters.size());
 		return clusters;
 	}
 }
