@@ -38,11 +38,12 @@ import rescuecore2.worldmodel.EntityID;
 public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	private int distance;
 	private Cluster cluster;
-	private Set<EntityID> roadsUnexplored = new HashSet<EntityID>();
+	private Set<EntityID> roadsUnexplored;
 	private Set<EntityID> roadsExplored = new HashSet<EntityID>();
 	private Set<EntityID> positionsBlockedCivilians = new HashSet<EntityID>();
 	private Set<EntityID> positionsBlockedPlatoon = new HashSet<EntityID>();
-	private Set<EntityID> positionsBlockedRefuge = new HashSet<EntityID>();
+	// private Set<EntityID> positionsBlockedRefuge = new HashSet<EntityID>();
+	private Set<EntityID> positionsStuckedHuman = new HashSet<EntityID>();
 	private Set<EntityID> positionsBlockdedRoadsTotally = new HashSet<EntityID>();
 	private Set<EntityID> roadsInCluster;
 	private Set<EntityID> buildingsInCluster;
@@ -82,7 +83,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		if (time == configuration.getIgnoreAgentCommand()) {
 			sendSubscribe(time, configuration.getPoliceChannel());// 注册了该通道的可以接收发往该通道的消息
 			if (me().isHPDefined() && me().isBuriednessDefined() && me().getHP() > 0 && me().getBuriedness() > 0) {
-				callForATHelp(time, MessageID.PF_BURIED);
+				callForATHelp(time, MessageID.PLATOON_BURIED);
 			}
 			return;
 		}
@@ -94,14 +95,14 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		addInjuredHumanInfoToMessageSend(time);
 		updateClearedRoads();
 		if (me().isHPDefined() && me().isBuriednessDefined() && me().getHP() > 0 && me().getBuriedness() > 0) {
-			callForATHelp(time, MessageID.PF_BURIED);
+			callForATHelp(time, MessageID.PLATOON_BURIED);
 			System.out.println(me().getID() + " is buried,hp is" + me().getHP());
 			return;
 		}
 		if (me().isHPDefined() && me().isDamageDefined() && me().getHP() > 0 && me().getDamage() > 0) {
-			if (canMoveToRefuge(time)) {
+			if (canMoveToRefuge(time,me(),refugesEntrancesMap)) {
 			} else {
-				callForATHelp(time, MessageID.PF_INJURED);
+				callForATHelp(time, MessageID.PLATOON_BURIED);
 			}
 			System.out.println(me().getID() + " is buried,hp is" + me().getHP() + ",damage is" + me().getDamage());
 		}
@@ -110,23 +111,29 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			templist.addAll(positionsBlockdedRoadsTotally);
 			distanceSort(templist, me());
 			pathByPriotity = search.getPath(me().getPosition(), templist.get(0), null);
-		} else if (!positionsBlockedRefuge.isEmpty()) {
-			templist.addAll(positionsBlockdedRoadsTotally);
+		} /*
+			 * else if (!positionsBlockedRefuge.isEmpty()) {
+			 * templist.addAll(positionsBlockedRefuge); distanceSort(templist,
+			 * me()); pathByPriotity = search.getPath(me().getPosition(),
+			 * templist.get(0), null); }
+			 */else if (!positionsStuckedHuman.isEmpty()) {
+			templist.addAll(positionsStuckedHuman);
 			distanceSort(templist, me());
 			pathByPriotity = search.getPath(me().getPosition(), templist.get(0), null);
 		} else if (!positionsBlockedPlatoon.isEmpty()) {
-			templist.addAll(positionsBlockdedRoadsTotally);
+			templist.addAll(positionsBlockedPlatoon);
 			distanceSort(templist, me());
 			pathByPriotity = search.getPath(me().getPosition(), templist.get(0), null);
 		} else if (!positionsBlockedCivilians.isEmpty()) {
+			templist.addAll(positionsBlockedCivilians);
 			distanceSort(templist, me());
 			pathByPriotity = search.getPath(me().getPosition(), templist.get(0), null);
 		}
-		if (clearBlockadesAroundRefuge(time, seenChanges)) {
-			return;
-		} else {
-			basicClear(time, seenChanges);
-		}
+		/*
+		 * if (clearBlockadesAroundRefuge(time, seenChanges)) { return; } else {
+		 */
+		basicClear(time, seenChanges);
+		// }
 	}
 
 	private void updateClearedRoads() {
@@ -136,22 +143,20 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			roadsUnexplored.remove(clearedRoadID);
 			positionsBlockedCivilians.remove(clearedRoadID);
 			positionsBlockedPlatoon.remove(clearedRoadID);
-			positionsBlockedRefuge.remove(clearedRoadID);
+			// positionsBlockedRefuge.remove(clearedRoadID);
 			positionsBlockdedRoadsTotally.remove(clearedRoadID);
 		}
 	}
 
 	// 看到的，肯定只有一个refuge
-	private boolean clearBlockadesAroundRefuge(int time, ChangeSetUtil seenChanges) {
-		if (clearNearBlockes(time))
-			return true;
-		Set<Blockade> seenBlockades = seenChanges.getSeenBlockadesAroundRefuge(refugesEntrancesMap);
-		if (moveToSeenBlockade(time, seenBlockades)) {
-			System.out.println("clear blockades around refuge totally");
-			return true;
-		}
-		return false;
-	}
+	/*
+	 * private boolean clearBlockadesAroundRefuge(int time, ChangeSetUtil
+	 * seenChanges) { if (clearNearBlockes(time)) return true; Set<Blockade>
+	 * seenBlockades =
+	 * seenChanges.getSeenBlockadesAroundRefuge(refugesEntrancesMap); if
+	 * (moveToSeenBlockade(time, seenBlockades)) { System.out.println(
+	 * "clear blockades around refuge totally"); return true; } return false; }
+	 */
 
 	private void handleHeard(int time, Collection<Command> heards) {
 		for (Command heard : heards) {
@@ -194,20 +199,26 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		}
 	}
 
-	private void handleMessage(EntityID postionID, MessageID messageID) {
+	private void handleMessage(EntityID positionID, MessageID messageID) {
 		System.out.println("pf of " + me().getID() + " is handling heard message ");
 		switch (messageID) {
 		case ROAD_CLEARED:
-			roadsExplored.add(postionID);
+			roadsExplored.add(positionID);
 			break;
 		case CIVILIAN_BLOCKED:
-			positionsBlockedCivilians.add(postionID);
+			positionsBlockedCivilians.add(positionID);
 			break;
 		case PLATOON_BLOCKED:
-			positionsBlockedPlatoon.add(postionID);
+			positionsBlockedPlatoon.add(positionID);
 			break;
+		case HUMAN_STUCKED:
+			positionsStuckedHuman.add(positionID);
+			break;
+		/*
+		 * case REFUGE_BLOCKED: positionsBlockedRefuge.add(positionID);
+		 */
 		case ROAD_BLOCKED_TOTALLY:
-			positionsBlockdedRoadsTotally.add(postionID);
+			positionsBlockdedRoadsTotally.add(positionID);
 			break;
 		default:
 			break;
@@ -238,25 +249,6 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		}
 	}
 
-	private boolean canMoveToRefuge(int time) {
-		Set<EntityID> refugeIDsInCluster = refugesEntrancesMap.keySet();
-		if (!refugeIDsInCluster.isEmpty()) {
-			List<EntityID> refugeIDs = new ArrayList<EntityID>(refugeIDsInCluster);
-			distanceSort(refugeIDs, me());
-			EntityID dest = ((EntityID[]) getEntrancesOfRefuges().get(refugeIDs.get(0)).toArray())[0];
-			List<EntityID> path = search.getPath(me().getPosition(), dest, null);
-			path.add(refugeIDs.get(0));
-			if (path != null) {
-				Refuge refuge = (Refuge) model.getEntity(refugeIDs.get(0));
-				Logger.info("Moving to refuge");
-				sendMove(time, path, refuge.getX(), refuge.getY());
-				System.out.println(me().getID() + "of pf move to refuge for damage");
-				return true;
-			}
-		}
-		return false;
-	}
-
 	private void basicClear(int time, ChangeSetUtil seenChanges) {
 		if (clearNearBlockes(time))
 			return;
@@ -269,7 +261,10 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		} else {
 			boolean traverslOk = traversalRoads(time);
 			if (!traverslOk) {
-				sendMove(time, randomWalkAroundRoadsOnly(roadsUnexplored));
+				List<EntityID> path = randomWalk(roadsInCluster);
+				System.out.println(me().getID()+" random walk in cluster");
+				if(path != null )
+					sendMove(time, path);
 			}
 			return;
 		}
@@ -316,12 +311,13 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 
 	private boolean traversalRoads(int time) {
 		if (roadsUnexplored.size() != 0) {
-			EntityID[] roadsID = roadsUnexplored.toArray(new EntityID[0]);
-			List<EntityID> path = search.getPath(me().getPosition(), roadsID[0], null);
+			List<EntityID> roadsIDs = new ArrayList<EntityID>(roadsUnexplored);
+			distanceSort(roadsIDs, me());
+			List<EntityID> path = search.getPath(me().getPosition(), roadsIDs.get(0), null);
 			if (path != null) {
 				System.out.println(me().getID() + " 遍历道路,非随机");
 				System.out.println();
-				Road r = (Road) model.getEntity(roadsID[0]);
+				Road r = (Road) model.getEntity(roadsIDs.get(0));
 				sendMove(time, path, r.getX(), r.getY());
 				return true;
 			}

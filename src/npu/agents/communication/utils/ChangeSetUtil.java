@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.junit.internal.builders.AnnotatedBuilder;
+
 import npu.agents.communication.model.BuildingStatus;
+import rescuecore.PlatoonAgent;
 import rescuecore2.misc.geometry.GeometryTools2D;
 import rescuecore2.misc.geometry.Line2D;
 import rescuecore2.misc.geometry.Point2D;
@@ -56,9 +59,9 @@ public class ChangeSetUtil {
 	private Set<EntityID> worseStatusBuildings = new HashSet<EntityID>();
 	private int preCountFieryBuildings;
 	private int countOfFieryBuildings;
-	private Set<Human> humanBuried = new HashSet<Human>();
-	private Set<Human> humanInjured = new HashSet<Human>();
-	private Set<Blockade> blockadesAroundRefuge = new HashSet<Blockade>();
+	private Set<Human> civilianInjured = new HashSet<Human>();
+	private Set<Human> platoonBuried = new HashSet<Human>();
+	//private Set<Blockade> blockadesAroundRefuge = new HashSet<Blockade>();
 	private EntityID refugeID;
 
 	private Set<EntityID> buildingsHeating = new HashSet<EntityID>();
@@ -168,17 +171,17 @@ public class ChangeSetUtil {
 
 	public void analyzeHumans() {
 		for (Human human : humans) {
-			if (human.isHPDefined() && human.isDamageDefined() && human.isBuriednessDefined()
-					&& human.isPositionDefined() && human.getHP() > 0 && human.getBuriedness() > 0) {
-				humanBuried.add(human);
-			}
-			if (human.isHPDefined() && human.isDamageDefined() && human.isBuriednessDefined()
+			if(human instanceof Civilian && human.isHPDefined() && human.isDamageDefined() && human.isBuriednessDefined()
 					&& human.isPositionDefined() && human.getHP() > 0
-					&& (human.getBuriedness() > 0 || human.getDamage() > 0)) {
-				humanInjured.add(human);
+					&& (human.getBuriedness() > 0 || human.getDamage() > 0)){
+				civilianInjured.add(human);
 			}
+			if(human instanceof AmbulanceTeam || human instanceof PoliceForce || human instanceof FireBrigade && human.isHPDefined() && human.isDamageDefined() && human.isBuriednessDefined()
+					&& human.isPositionDefined() && human.getHP() > 0 && human.getBuriedness() > 0) 
+				platoonBuried.add(human);
+			}
+		
 		}
-	}
 
 	public boolean isBuildingStatusWorse(Building building) {
 		if (preBuildingStatusMap != null && preBuildingStatusMap.keySet().contains(building.getID())) {
@@ -211,7 +214,7 @@ public class ChangeSetUtil {
 
 
 
-	public Set<Blockade> getSeenBlockadesAroundRefuge(Map<EntityID, Set<EntityID>> map) {
+/*	public Set<Blockade> getSeenBlockadesAroundRefuge(Map<EntityID, Set<EntityID>> map) {
 		if (refugeID != null) {
 			for (Blockade blockade : getSeenBlockades()) {
 				if (map.keySet().contains(refugeID) && map.get(refugeID).contains(blockade.getPosition()))
@@ -219,7 +222,7 @@ public class ChangeSetUtil {
 			}
 		}
 		return blockadesAroundRefuge;
-	}
+	}*/
 
 
 
@@ -418,13 +421,14 @@ public class ChangeSetUtil {
 		fireBrigades.clear();
 		ambulanceTeams.clear();
 
-		blockadesAroundRefuge.clear();
+		//blockadesAroundRefuge.clear();
 		refugeID = null;
 		buildingsUnburnt.clear();
 		buildingsIsWarm.clear();
 		buildingsExtinguished.clear();
 	    buildingsOnFire.clear();
-		humanBuried.clear();
+	    platoonBuried.clear();
+	    civilianInjured.clear();
 
 		buildingStatusMap.clear();
 		worseStatusBuildings.clear();
@@ -470,12 +474,18 @@ public class ChangeSetUtil {
 	public Set<EntityID> getBuildingsInferno() {
 		return buildingsInferno;
 	}
-	public Set<Human> getBuriedHuman() {
-		return humanBuried;
+	public Set<Human> getInjuredCivilians() {
+		return civilianInjured;
 	}
 
-	public Set<Human> getInjuredHuman() {
-		return humanInjured;
+	public Set<Human> getBuriedPlatoons() {
+		return platoonBuried;
+	}
+	public Set<Human> getInjuredHumans() {
+		Set<Human> humans = new HashSet<Human>();
+		humans.addAll(getInjuredCivilians());
+		humans.addAll(getBuriedPlatoons());
+		return humans;
 	}
 
 	public Set<Blockade> getSeenBlockades() {

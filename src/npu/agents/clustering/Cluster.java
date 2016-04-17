@@ -18,6 +18,7 @@ public class Cluster {
 	private EntityID agentID;
 	private Road closestRoadAroundCenter;
 	private Map<EntityID,Set<EntityID>> roadAroundRefuge = new HashMap<EntityID,Set<EntityID>>();
+	private Map<EntityID,Set<EntityID>> buildingsEntrances = new HashMap<EntityID,Set<EntityID>>();
 	public Road getClosestRoadAroundCenter() {
 		return closestRoadAroundCenter;
 	}
@@ -51,6 +52,12 @@ public class Cluster {
 	}
 	public Set<EntityID> getRoadsInCluster() {
 		return roadsInCluster;
+	}
+	public void setBuildingsEntrances(EntityID buildingID,Set<EntityID> roadsID){
+		this.buildingsEntrances.put(buildingID, roadsID);
+	}
+	public Map<EntityID,Set<EntityID>> getBuildingsEntrances() {
+		return buildingsEntrances;
 	}
 	public Map<EntityID,Set<EntityID>> getRoadARoundRefuge() {
 		return roadAroundRefuge;

@@ -38,7 +38,7 @@ public class ClustingMap {
 		if (!hasCompute) {
 			clustingBuildings(k, iterTimes, model);
 			setRoadsInCluster(model);
-			setRefugesEntrances(model);
+			setRefugesAndBuildingsEntrances(model);
 			hasCompute = true;
 		}
 	}
@@ -55,7 +55,7 @@ public class ClustingMap {
 			point.setId(building.getID());
 			if (!allPoints.contains(point)) {
 				allPoints.add(point);
-				setBuildingsEntrances(building,model);
+				//setBuildingsEntrances(building, model);
 			}
 		}
 		clusters = KMeans.getClusters(k, iterTimes, allPoints);
@@ -101,31 +101,47 @@ public class ClustingMap {
 		return buildingEntrances;
 	}
 
-	private static void setRefugesEntrances(StandardWorldModel model) {
-		for(Cluster cluster: clusters) {
-		   for(EntityID building : cluster.getBuildingsIDs()) {
-			   StandardEntity entity = model.getEntity(building);
-			   if(entity instanceof Refuge) {
-				   Refuge refuge = (Refuge)entity;
-				   Set<EntityID> roads = new HashSet<EntityID>();
-				   EntityID refugeID = null;
-				   for (EntityID id : refuge.getNeighbours()) {
+	private static void setRefugesAndBuildingsEntrances(StandardWorldModel model) {
+		Set<EntityID> templist = new HashSet<EntityID>();
+		EntityID entityID = null;
+		for (Cluster cluster : clusters) {
+			for (EntityID entity : cluster.getBuildingsIDs()) {
+				StandardEntity standard = model.getEntity(entity);
+				if (standard instanceof Refuge) {
+					Refuge refuge = (Refuge) standard;
+					for (EntityID id : refuge.getNeighbours()) {
 						StandardEntity nearEntity = model.getEntity(id);
 						if (nearEntity instanceof Road) {
-							roads.add(nearEntity.getID());
-							refugeID = refuge.getID();
+							templist.add(nearEntity.getID());
+							entityID = refuge.getID();
 						}
 					}
-				   if (refugeID != null) {
-						cluster.setRoadAroudRefuge(refugeID, roads);
-						System.out.println("set roads of refuge in cluster"+refugeID);
-						refugeID = null;
-						roads.clear();
+					if (entityID != null) {
+						cluster.setRoadAroudRefuge(entityID, templist);
+						System.out.println("set roads of refuge in cluster" + entityID);
+						entityID = null;
+						templist.clear();
 					}
-			   }
-		   }
+				} else {
+					Building building = (Building) standard;
+					for (EntityID id : building.getNeighbours()) {
+						StandardEntity nearEntity = model.getEntity(id);
+						if (nearEntity instanceof Road) {
+							templist.add(nearEntity.getID());
+							entityID = building.getID();
+						}
+					}
+					if (entityID != null) {
+						cluster.setBuildingsEntrances(entityID, templist);
+						System.out.println("set roads of building in cluster" + entityID);
+						entityID = null;
+						templist.clear();
+					}
+				}
+			}
 		}
 	}
+
 	/**
 	 * 将Agent分给指定的簇
 	 * 

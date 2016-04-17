@@ -19,6 +19,7 @@ import npu.agents.communication.utils.ConfigUtil;
 import npu.agents.communication.utils.CommUtils.MessageID;
 import npu.agents.pf.strategy.ClearUtil;
 import npu.agents.search.AStar;
+import rescuecore2.log.Logger;
 import rescuecore2.misc.Pair;
 import rescuecore2.standard.components.StandardAgent;
 import rescuecore2.standard.entities.Blockade;
@@ -31,7 +32,7 @@ import rescuecore2.standard.entities.StandardEntity;
 import rescuecore2.worldmodel.EntityID;
 
 public abstract class AbstractCommonAgent<E extends StandardEntity> extends StandardAgent<E> {
-	private static final int RANDOM_WALK_LENGTH = 50;
+	protected static final int RANDOM_WALK_LENGTH = 50;
 	protected ConfigUtil configuration;
 	/**
 	 * The search algorithm.
@@ -56,7 +57,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 	 */
 	protected Set<EntityID> hydrantIDs;
 
-	private Map<EntityID, Set<EntityID>> neighbours;
+	protected Map<EntityID, Set<EntityID>> neighbours;
 
 	protected ClearUtil clearUtil;
 	protected ChangeSetUtil seenChanges;
@@ -99,6 +100,24 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		sendRest(time);
 		System.out.println(messageID.name()+ " of " + me().getID() + " at " + time);
 	}
+	protected boolean canMoveToRefuge(int time,Human me,Map<EntityID, Set<EntityID>> refugesEntrancesMap) {
+		Set<EntityID> refugeIDsInCluster = refugesEntrancesMap.keySet();
+		if (!refugeIDsInCluster.isEmpty()) {
+			List<EntityID> refugeIDs = new ArrayList<EntityID>(refugeIDsInCluster);
+			distanceSort(refugeIDs, me);
+			EntityID dest = ((EntityID[]) getEntrancesOfRefuges().get(refugeIDs.get(0)).toArray())[0];
+			List<EntityID> path = search.getPath(me.getPosition(), dest, null);
+			path.add(refugeIDs.get(0));
+			if (path != null) {
+				Refuge refuge = (Refuge) model.getEntity(refugeIDs.get(0));
+				Logger.info("Moving to refuge");
+				sendMove(time, path, refuge.getX(), refuge.getY());
+				System.out.println(me().getID() + "of at move to refuge for damage");
+				return true;
+			}
+		}
+		return false;
+	}
 	protected void addBuildingInfoToMessageSend(int time) {
 	/*	for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
 			Message message = new Message(MessageID.BUILDING_UNBURNT, unburntBuidingID, time,
@@ -131,10 +150,38 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 	}
 
 	protected void addInjuredHumanInfoToMessageSend(int time) {
-		for (Human human : seenChanges.getBuriedHuman()) {
-			Message message = new Message(MessageID.HUMAN_BURIED, human.getPosition(), time,
+		for (Human human : seenChanges.getBuriedPlatoons()) {
+			Message message = new Message(MessageID.PLATOON_BURIED, human.getPosition(), time,
 					configuration.getAmbulanceChannel());
 			if(human.getID() != me().getID())
+			messagesWillSend.add(message);
+		}
+		for (Human human : seenChanges.getInjuredCivilians()) {
+			Message message = new Message(MessageID.CIVILIAN_INJURED, human.getPosition(), time,
+					configuration.getAmbulanceChannel());
+			if(human.getID() != me().getID())
+			messagesWillSend.add(message);
+		}
+	}
+	public void addRoadsInfoToMessageSend(int time) {
+		for(Blockade blockade: seenChanges.getSeenBlockades()) {
+			Message message = new Message(MessageID.PLATOON_BLOCKED, blockade.getID(), time,
+					configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+		}
+		for (Road road : seenChanges.getTotallyBlockedRoad()) {
+			Message message = new Message(MessageID.ROAD_BLOCKED_TOTALLY, road.getID(), time,
+					configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+		}
+
+		for (Blockade blockadeStuckedHuman : seenChanges.getBlockadesHumanStuckedIn()) {
+			Message message = new Message(MessageID.HUMAN_STUCKED, blockadeStuckedHuman.getPosition(), time,
+					configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+		}
+		for (EntityID roadID : seenChanges.getClearedRoads()) {
+			Message message = new Message(MessageID.ROAD_CLEARED, roadID, time, configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 		}
 	}
@@ -157,7 +204,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		}
 		messagesWillSend.clear();
 	}
-	protected List<EntityID> randomWalkAroundRoadsOnly(Set<EntityID> roadsID) {
+	protected List<EntityID> randomWalk(Set<EntityID> ids) {
 		List<EntityID> result = new ArrayList<EntityID>(RANDOM_WALK_LENGTH);
 		Set<EntityID> seen = new HashSet<EntityID>();
 		EntityID current = ((Human) me()).getPosition();
@@ -169,16 +216,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 			boolean found = false;
 			for (EntityID next : possible) {
 				// 警察和消防只能在该簇内的道路上遍历，医生都要遍历
-				if (roadsID != null && roadsID.contains(next)) {
-					if (seen.contains(next)) {
-						continue;
-					}
-					current = next;
-					found = true;
-					System.out.print("在该簇内的道路遍历");
-					break;
-				}
-				if (roadsID == null) {
+				if (ids.contains(next)) {
 					if (seen.contains(next)) {
 						continue;
 					}
