@@ -17,7 +17,6 @@ import npu.agents.communication.model.Message;
 import npu.agents.communication.utils.ChangeSetUtil;
 import npu.agents.communication.utils.ConfigUtil;
 import npu.agents.communication.utils.CommUtils.MessageID;
-import npu.agents.pf.strategy.ClearUtil;
 import npu.agents.search.AStar;
 import rescuecore2.log.Logger;
 import rescuecore2.misc.Pair;
@@ -59,7 +58,6 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 
 	protected Map<EntityID, Set<EntityID>> neighbours;
 
-	protected ClearUtil clearUtil;
 	protected ChangeSetUtil seenChanges;
 	protected Set<Message> messagesWillSend = new HashSet<Message>();
 
@@ -91,16 +89,17 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		search = new AStar(model);
 		neighbours = search.getGraph();
 		configuration = new ConfigUtil(config);
-		clearUtil = new ClearUtil();
 		seenChanges = new ChangeSetUtil();
 	}
-	protected void callForATHelp(int time,MessageID messageID) {
+
+	protected void callForATHelp(int time, MessageID messageID) {
 		Message message = new Message(messageID, me().getID(), time, configuration.getAmbulanceChannel());
 		messagesWillSend.add(message);
 		sendRest(time);
-		System.out.println(messageID.name()+ " of " + me().getID() + " at " + time);
+		System.out.println(messageID.name() + " of " + me().getID() + " at " + time);
 	}
-	protected boolean canMoveToRefuge(int time,Human me,Map<EntityID, Set<EntityID>> refugesEntrancesMap) {
+
+	protected boolean canMoveToRefuge(int time, Human me, Map<EntityID, Set<EntityID>> refugesEntrancesMap) {
 		Set<EntityID> refugeIDsInCluster = refugesEntrancesMap.keySet();
 		if (!refugeIDsInCluster.isEmpty()) {
 			List<EntityID> refugeIDs = new ArrayList<EntityID>(refugeIDsInCluster);
@@ -118,16 +117,17 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		}
 		return false;
 	}
+
 	protected void addBuildingInfoToMessageSend(int time) {
-	/*	for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
-			Message message = new Message(MessageID.BUILDING_UNBURNT, unburntBuidingID, time,
-					configuration.getFireChannel());
-			messagesWillSend.add(message);
-		}*/
+		/*
+		 * for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
+		 * Message message = new Message(MessageID.BUILDING_UNBURNT,
+		 * unburntBuidingID, time, configuration.getFireChannel());
+		 * messagesWillSend.add(message); }
+		 */
 		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
 			System.out.println("send warm building message");
-			Message message = new Message(MessageID.BUILDING_WARM, warmBuidingID, time,
-					configuration.getFireChannel());
+			Message message = new Message(MessageID.BUILDING_WARM, warmBuidingID, time, configuration.getFireChannel());
 			messagesWillSend.add(message);
 		}
 		for (EntityID onFireBuildingID : seenChanges.getBuildingsOnFire()) {
@@ -142,9 +142,10 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 					configuration.getFireChannel());
 			messagesWillSend.add(message);
 		}
-		for(EntityID burtOutBuildingID : seenChanges.getBuildingBurtOut()) {
+		for (EntityID burtOutBuildingID : seenChanges.getBuildingBurtOut()) {
 			System.out.println("send burtOut building message");
-			Message message = new Message(MessageID.BUILDING_BURNT_OUT,burtOutBuildingID,time,configuration.getFireChannel());
+			Message message = new Message(MessageID.BUILDING_BURNT_OUT, burtOutBuildingID, time,
+					configuration.getFireChannel());
 			messagesWillSend.add(message);
 		}
 	}
@@ -153,18 +154,19 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		for (Human human : seenChanges.getBuriedPlatoons()) {
 			Message message = new Message(MessageID.PLATOON_BURIED, human.getPosition(), time,
 					configuration.getAmbulanceChannel());
-			if(human.getID() != me().getID())
-			messagesWillSend.add(message);
+			if (human.getID() != me().getID())
+				messagesWillSend.add(message);
 		}
 		for (Human human : seenChanges.getInjuredCivilians()) {
 			Message message = new Message(MessageID.CIVILIAN_INJURED, human.getPosition(), time,
 					configuration.getAmbulanceChannel());
-			if(human.getID() != me().getID())
-			messagesWillSend.add(message);
+			if (human.getID() != me().getID())
+				messagesWillSend.add(message);
 		}
 	}
+
 	public void addRoadsInfoToMessageSend(int time) {
-		for(Blockade blockade: seenChanges.getSeenBlockades()) {
+		for (Blockade blockade : seenChanges.getSeenBlockades()) {
 			Message message = new Message(MessageID.PLATOON_BLOCKED, blockade.getID(), time,
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message);
@@ -185,10 +187,12 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 			messagesWillSend.add(message);
 		}
 	}
-    protected void sendMessages(int time) {
-    	sendAllVoiceMessages(time);
+
+	protected void sendMessages(int time) {
+		sendAllVoiceMessages(time);
 		sendAllRadioMessages(time);
-    }
+	}
+
 	private void sendAllRadioMessages(int time) {
 		for (Message message : messagesWillSend) {
 			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
@@ -204,6 +208,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		}
 		messagesWillSend.clear();
 	}
+
 	protected List<EntityID> randomWalk(Set<EntityID> ids) {
 		List<EntityID> result = new ArrayList<EntityID>(RANDOM_WALK_LENGTH);
 		Set<EntityID> seen = new HashSet<EntityID>();
@@ -274,16 +279,17 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		return (int) Math.hypot(pair.first() - x, pair.second() - y);
 	}
 
-	protected int getDistanceByPath(List<EntityID> path,Human me) {
+	protected int getDistanceByPath(List<EntityID> path, Human me) {
 		int distance = 0;
-		Pair<Integer,Integer> start =  new Pair(me.getX(),me.getY());
-		for(EntityID id: path) {
+		Pair<Integer, Integer> start = new Pair(me.getX(), me.getY());
+		for (EntityID id : path) {
 			Pair<Integer, Integer> next = model.getEntity(id).getLocation(model);
-			distance += (int)Math.hypot(next.first()-start.first(), next.second() - start.second());
+			distance += (int) Math.hypot(next.first() - start.first(), next.second() - start.second());
 			start = next;
 		}
 		return distance;
 	}
+
 	protected EntityID positionWhereIStuckedIn(Set<Blockade> seenBlockades, Human me) {
 		Set<Blockade> blockades = new HashSet<Blockade>();
 		for (Blockade blockade : seenBlockades) {

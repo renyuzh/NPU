@@ -55,7 +55,7 @@ public class ClustingMap {
 			point.setId(building.getID());
 			if (!allPoints.contains(point)) {
 				allPoints.add(point);
-				//setBuildingsEntrances(building, model);
+				// setBuildingsEntrances(building, model);
 			}
 		}
 		clusters = KMeans.getClusters(k, iterTimes, allPoints);

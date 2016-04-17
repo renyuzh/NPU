@@ -8,34 +8,43 @@ public class Message {
 	private EntityID positionID;
 	private int time;
 	private int channel;
-	public Message(MessageID messageID,EntityID positionID, int time, int channel) {
+
+	public Message(MessageID messageID, EntityID positionID, int time, int channel) {
 		super();
 		this.messageID = messageID;
 		this.positionID = positionID;
 		this.time = time;
 		this.channel = channel;
 	}
+
 	public MessageID getMessageID() {
 		return messageID;
 	}
+
 	public EntityID getPositionID() {
 		return positionID;
 	}
+
 	public void setPostionID(EntityID positionID) {
 		this.positionID = positionID;
 	}
+
 	public int getTime() {
 		return time;
 	}
+
 	public void setTime(int time) {
 		this.time = time;
 	}
+
 	public int getChannel() {
 		return channel;
 	}
+
 	public void setChannel(int channel) {
 		this.channel = channel;
 	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -44,6 +53,7 @@ public class Message {
 		result = prime * result + ((positionID == null) ? 0 : positionID.hashCode());
 		return result;
 	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -60,6 +70,5 @@ public class Message {
 			return false;
 		return true;
 	}
-	
-	
+
 }

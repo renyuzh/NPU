@@ -10,8 +10,9 @@ import rescuecore2.config.Config;
 
 public class CommUtils {
 	public static enum MessageID {
-		PLATOON_BURIED,PLATOON_INJURED,FB_STUCKED,FB_NEED_COLLABORATION,HUMAN_STUCKED,CIVILIAN_BLOCKED,PLATOON_STUCKED,PLATOON_BLOCKED,ROAD_BLOCKED_TOTALLY,AT_BLOCKED,AT_STUCKED,FB_BURIED,HUMAN_INJURED_SERIOUSLY,BUILDING_ON_FIRE, AT_BURIED,HUMAN_BURIED,CIVILIAN_BlOCKED,CIVILIAN_BURIED,CIVILIAN_INJURED,REFUGE_BLOCKED,REMOVE_AGENT, PF_INJURED,PF_BURIED,BUILDING_EXTINGUISHED, BUILDING_COLLAPSED, BUILDING_WARM, BUILDING_UNBURNT, BUILDING_CLEARED,BUILDING_HEATING,BUILDING_BURNING, BUILDING_INFERNO,BUILDING_BURNT_OUT,CIVILIAN_LOCATION_BURIED, CIVILIAN_LOCATION_NOT_BURIED, HYDRANT_AVAILABLE, HYDRANT_OCCUPIED, REFUGE_FILLING_RATE, AFTER_SHOCK, ROAD_BLOCKED, EDGE_BLOCKED, ROAD_CLEARED, EDGE_CLEARED, ROAD_OCCUPIED, ROAD_BLOCKED_PRIORITIZED, FINISHED_CLUSTER_POLICE, FINISHED_CLUSTER_FIRE, FINISHED_CLUSTER_AMBULANCE, AGENT_LOCATION_HEARD_CIVILIAN, BURIED_AGENT_LOCATION, STUCK_INSIDE_BLOCKADE, CLUSTER_STATUS, ONE_CLUSTER_STATUS, REMOVE_ENTITY
+		PLATOON_BURIED, PLATOON_INJURED, FB_STUCKED, FB_NEED_COLLABORATION, HUMAN_STUCKED, CIVILIAN_BLOCKED, PLATOON_STUCKED, PLATOON_BLOCKED, ROAD_BLOCKED_TOTALLY, AT_BLOCKED, AT_STUCKED, FB_BURIED, HUMAN_INJURED_SERIOUSLY, BUILDING_ON_FIRE, AT_BURIED, HUMAN_BURIED, CIVILIAN_BlOCKED, CIVILIAN_BURIED, CIVILIAN_INJURED, REFUGE_BLOCKED, REMOVE_AGENT, PF_INJURED, PF_BURIED, BUILDING_EXTINGUISHED, BUILDING_COLLAPSED, BUILDING_WARM, BUILDING_UNBURNT, BUILDING_CLEARED, BUILDING_HEATING, BUILDING_BURNING, BUILDING_INFERNO, BUILDING_BURNT_OUT, CIVILIAN_LOCATION_BURIED, CIVILIAN_LOCATION_NOT_BURIED, HYDRANT_AVAILABLE, HYDRANT_OCCUPIED, REFUGE_FILLING_RATE, AFTER_SHOCK, ROAD_BLOCKED, EDGE_BLOCKED, ROAD_CLEARED, EDGE_CLEARED, ROAD_OCCUPIED, ROAD_BLOCKED_PRIORITIZED, FINISHED_CLUSTER_POLICE, FINISHED_CLUSTER_FIRE, FINISHED_CLUSTER_AMBULANCE, AGENT_LOCATION_HEARD_CIVILIAN, BURIED_AGENT_LOCATION, STUCK_INSIDE_BLOCKADE, CLUSTER_STATUS, ONE_CLUSTER_STATUS, REMOVE_ENTITY
 	};
+
 	/**
 	 * Discovers the available communication channels and their properties
 	 * 
@@ -21,8 +22,8 @@ public class CommUtils {
 	 *            : list of radio channels
 	 * @param config
 	 */
-	public static void discoverChannels(ArrayList<VoiceChannel> voiceChannel,
-			ArrayList<RadioChannel> radioChannel, Config config) {
+	public static void discoverChannels(ArrayList<VoiceChannel> voiceChannel, ArrayList<RadioChannel> radioChannel,
+			Config config) {
 		String comm = rescuecore2.standard.kernel.comms.ChannelCommunicationModel.PREFIX;
 		int channels = config.getIntValue(comm + "count");
 		for (int i = 0; i < channels; i++) {
@@ -34,8 +35,7 @@ public class CommUtils {
 				int range = config.getIntValue(comm + i + ".range");
 				int msgSize = config.getIntValue(comm + i + ".messages.size");
 				int maxMsg = config.getIntValue(comm + i + ".messages.max");
-				voiceChannel.add(new VoiceChannel(i, type, range, maxMsg,
-						msgSize));
+				voiceChannel.add(new VoiceChannel(i, type, range, maxMsg, msgSize));
 			}
 		}
 	}
@@ -49,8 +49,7 @@ public class CommUtils {
 	 *            : the type of the agent ('f','p' or 'a')
 	 * @return
 	 */
-	public static int decideRadioChannel(ArrayList<RadioChannel> channels,
-			char type) {
+	public static int decideRadioChannel(ArrayList<RadioChannel> channels, char type) {
 		int size = channels.size();
 		// arrange according to bandwidth
 		Comparator<RadioChannel> comp = new Comparator<RadioChannel>() {

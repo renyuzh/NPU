@@ -100,7 +100,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			return;
 		}
 		if (me().isHPDefined() && me().isDamageDefined() && me().getHP() > 0 && me().getDamage() > 0) {
-			if (canMoveToRefuge(time,me(),refugesEntrancesMap)) {
+			if (canMoveToRefuge(time, me(), refugesEntrancesMap)) {
 			} else {
 				callForATHelp(time, MessageID.PLATOON_BURIED);
 			}
@@ -262,8 +262,8 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			boolean traverslOk = traversalRoads(time);
 			if (!traverslOk) {
 				List<EntityID> path = randomWalk(roadsInCluster);
-				System.out.println(me().getID()+" random walk in cluster");
-				if(path != null )
+				System.out.println(me().getID() + " random walk in cluster");
+				if (path != null)
 					sendMove(time, path);
 			}
 			return;

@@ -17,58 +17,74 @@ public class Cluster {
 	private Set<EntityID> roadsInCluster = new HashSet<EntityID>();
 	private EntityID agentID;
 	private Road closestRoadAroundCenter;
-	private Map<EntityID,Set<EntityID>> roadAroundRefuge = new HashMap<EntityID,Set<EntityID>>();
-	private Map<EntityID,Set<EntityID>> buildingsEntrances = new HashMap<EntityID,Set<EntityID>>();
+	private Map<EntityID, Set<EntityID>> roadAroundRefuge = new HashMap<EntityID, Set<EntityID>>();
+	private Map<EntityID, Set<EntityID>> buildingsEntrances = new HashMap<EntityID, Set<EntityID>>();
+
 	public Road getClosestRoadAroundCenter() {
 		return closestRoadAroundCenter;
 	}
+
 	public void setClosestRoadAroundCenter(Road closestRoadAroundCenter) {
 		this.closestRoadAroundCenter = closestRoadAroundCenter;
 	}
+
 	public EntityID getAgentID() {
 		return agentID;
 	}
+
 	public void setAgentID(EntityID id) {
 		this.agentID = id;
 	}
+
 	public Cluster(Point centerPoint) {
 		this.centerPoint = centerPoint;
 	}
+
 	public void addMember(Point member) {
-		if(member.getId()!=null)
+		if (member.getId() != null)
 			members.add(member);
 	}
+
 	public void setRoadsInCluster(EntityID roadID) {
 		roadsInCluster.add(roadID);
 	}
-	public void setRoadAroudRefuge(EntityID refugeID,Set<EntityID> roadsID) {
+
+	public void setRoadAroudRefuge(EntityID refugeID, Set<EntityID> roadsID) {
 		this.roadAroundRefuge.put(refugeID, roadsID);
 	}
+
 	public Point getCenterPoint() {
 		return centerPoint;
 	}
+
 	public void setCenterPoint(Point centerPoint) {
 		this.centerPoint = centerPoint;
 	}
+
 	public Set<EntityID> getRoadsInCluster() {
 		return roadsInCluster;
 	}
-	public void setBuildingsEntrances(EntityID buildingID,Set<EntityID> roadsID){
+
+	public void setBuildingsEntrances(EntityID buildingID, Set<EntityID> roadsID) {
 		this.buildingsEntrances.put(buildingID, roadsID);
 	}
-	public Map<EntityID,Set<EntityID>> getBuildingsEntrances() {
+
+	public Map<EntityID, Set<EntityID>> getBuildingsEntrances() {
 		return buildingsEntrances;
 	}
-	public Map<EntityID,Set<EntityID>> getRoadARoundRefuge() {
+
+	public Map<EntityID, Set<EntityID>> getRoadARoundRefuge() {
 		return roadAroundRefuge;
 	}
+
 	public Set<Point> getMembers() {
 		return members;
 	}
+
 	public Set<EntityID> getBuildingsIDs() {
 		List<Point> points = new ArrayList<Point>(getMembers());
 		Set<EntityID> ids = new HashSet<EntityID>();
-		for(Point  point : points) {
+		for (Point point : points) {
 			ids.add(point.getId());
 		}
 		return ids;

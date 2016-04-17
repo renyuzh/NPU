@@ -11,7 +11,8 @@ import rescuecore2.standard.entities.StandardEntityConstants.Fieryness;
 public class BuildingStatus {
 	private static final int WARM_TEMPERATURE = 30;
 	private Building building;
-	private int fieryness = Integer.MAX_VALUE;// only compare heating,building,and Inferno
+	private int fieryness = Integer.MAX_VALUE;// only compare
+												// heating,building,and Inferno
 
 	public BuildingStatus(Building building, Fieryness fieryness) {
 		this.building = building;

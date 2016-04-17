@@ -3,7 +3,6 @@ package npu.agents.fb;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -15,21 +14,15 @@ import npu.agents.clustering.Cluster;
 import npu.agents.clustering.ClustingMap;
 import npu.agents.common.AbstractCommonAgent;
 import npu.agents.communication.model.Message;
-import npu.agents.communication.utils.ChangeSetUtil;
 import npu.agents.communication.utils.CommUtils.MessageID;
-import npu.agents.utils.DistanceSorter;
 import npu.agents.utils.KConstants;
 import rescuecore2.log.Logger;
 import rescuecore2.messages.Command;
-import rescuecore2.misc.Pair;
-import rescuecore2.standard.entities.Blockade;
 import rescuecore2.standard.entities.Civilian;
 import rescuecore2.standard.entities.FireBrigade;
-import rescuecore2.standard.entities.Human;
 import rescuecore2.standard.entities.Hydrant;
 import rescuecore2.standard.entities.Refuge;
 import rescuecore2.standard.entities.Road;
-import rescuecore2.standard.entities.StandardEntity;
 import rescuecore2.standard.entities.StandardEntityURN;
 import rescuecore2.standard.messages.AKSpeak;
 import rescuecore2.worldmodel.ChangeSet;
@@ -40,23 +33,26 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	private Set<EntityID> buildingUnexplored = new HashSet<EntityID>();
 	private Set<Message> messagesWillSend = new HashSet<Message>();
 	private Set<EntityID> onFireBuildingsIDs = new HashSet<EntityID>();
-/*	private Set<EntityID> warmBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID> heatingBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID> burningBuildingsIDs = new HashSet<EntityID>();
-	private Set<EntityID> InfernoBuildingsIDs = new HashSet<EntityID>();*/
+	/*
+	 * private Set<EntityID> warmBuildingsIDs = new HashSet<EntityID>(); private
+	 * Set<EntityID> heatingBuildingsIDs = new HashSet<EntityID>(); private
+	 * Set<EntityID> burningBuildingsIDs = new HashSet<EntityID>(); private
+	 * Set<EntityID> InfernoBuildingsIDs = new HashSet<EntityID>();
+	 */
 	private Set<EntityID> burnOutBuildingIDs = new HashSet<EntityID>();
 	private Set<EntityID> extinguishedBuildingsIDs = new HashSet<EntityID>();
 	private Set<EntityID> unburntBuildingsIDs = new HashSet<EntityID>();
 	private Set<EntityID> collaborationTasks = new HashSet<EntityID>();
 	private Set<EntityID> callForFBHelpTasks = new HashSet<EntityID>();
-	private Map<EntityID,Integer> distanceToHelp = new HashMap<EntityID,Integer>();
-	private Map<EntityID,Set<Integer>> distancesToHelpOfotherFBs = new HashMap<EntityID,Set<Integer>>();
-	//private Set<EntityID> fieryBuildingsNowCluster = new HashSet<EntityID>();
+	private Map<EntityID, Integer> distanceToHelp = new HashMap<EntityID, Integer>();
+	private Map<EntityID, Set<Integer>> distancesToHelpOfotherFBs = new HashMap<EntityID, Set<Integer>>();
+	// private Set<EntityID> fieryBuildingsNowCluster = new HashSet<EntityID>();
 	private int maxWater;
 	private int maxDistance;
 	private int maxPower;
 	private Set<EntityID> roadsInCluster;
 	private Map<EntityID, Set<EntityID>> buildingEntrances;
+	private Map<EntityID, Set<EntityID>> refugesEntrancesMap;
 
 	@Override
 	protected void postConnect() {
@@ -72,12 +68,13 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 			e.printStackTrace();
 			System.out.println("聚类失败");
 		}
-		buildingUnexplored = cluster.getMembersID();
-		roadsInCluster = cluster.getRoadsAroundCluster();
+		buildingUnexplored = cluster.getBuildingsIDs();
+		roadsInCluster = cluster.getRoadsInCluster();
 		maxWater = configuration.getMaxWater();
 		maxDistance = configuration.getMaxFireExtinguishDistance();
 		maxPower = configuration.getMaxFirePower();
 		buildingEntrances = ClustingMap.getBuildingEntrances();
+		refugesEntrancesMap = cluster.getRoadARoundRefuge();
 
 	}
 
@@ -86,13 +83,18 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		if (time < configuration.getIgnoreAgentCommand())
 			return;
 		handleReceiveMessages(time, changes, heard);
-		sendAllVoiceMessages(time);
-		sendAllRadioMessages(time);
+		sendMessages(time);
 	}
 
 	public void handleReceiveMessages(int time, ChangeSet changes, Collection<Command> heard) {
 		if (time == configuration.getIgnoreAgentCommand()) {
 			sendSubscribe(time, configuration.getFireChannel());// 注册了该通道的都可以接收到
+			if (me().isHPDefined() && me().isBuriednessDefined() && me().getHP() > 0 && me().getBuriedness() > 0) {
+				// TODO 暂时不管
+				callForATHelp(time, MessageID.AT_BURIED);
+				System.out.println(me().getID() + " is buried,hp is" + me().getHP());
+			}
+			return;
 		}
 		handleHeard(time, heard);
 		seenChanges.handleChanges(model, changes);
@@ -100,15 +102,18 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		addInjuredHumanInfoToMessageSend(time);
 		addRoadsInfoToMessageSend(time);
 		updateExtinguishedBuildings(time);
-		EntityID position = positionMeStuckedIn(seenChanges.getSeenBlockades(), me());
+		EntityID position = positionWhereIStuckedIn(seenChanges.getSeenBlockades(), me());
 		if (position != null) {
-			Message message = new Message(MessageID.FB_STUCKED, position, time, configuration.getPoliceChannel());
+			Message message = new Message(MessageID.PLATOON_STUCKED, position, time, configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 			return;
 		}
-		if (me().getHP() > 0 && (me().getBuriedness() > 0 || me().getDamage() > 0)) {
-			handleBuriedMe(time);
-			return;
+		if (me().isHPDefined() && me().isDamageDefined() && me().getHP() > 0 && me().getDamage() > 0) {
+			if (canMoveToRefuge(time, me(), refugesEntrancesMap)) {
+			} else {
+				callForATHelp(time, MessageID.PLATOON_BURIED);
+			}
+			System.out.println(me().getID() + " is buried,hp is" + me().getHP() + ",damage is" + me().getDamage());
 		}
 		if (isFillingWater(time))
 			return;
@@ -125,48 +130,52 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 			return;
 		}
 		distancesToHelpOfotherFBs.clear();
-	/*	if (changeClusterToHelpOtherFB(time)) {
-			
-		}*/
-		List<EntityID> path = randomWalkAroundRoadsOnly(roadIDs);
-		sendMove(time, path);
+		/*
+		 * if (changeClusterToHelpOtherFB(time)) {
+		 * 
+		 * }
+		 */
+		List<EntityID> path = randomWalk(roadIDs);
+		if (path != null)
+			sendMove(time, path);
 
 	}
 
-/*	private boolean changeClusterToHelpOtherFB(int time) {
-		if(seenChanges.getBuildingsOnFire() != null || )
-		return false;
-	}*/
+	/*
+	 * private boolean changeClusterToHelpOtherFB(int time) {
+	 * if(seenChanges.getBuildingsOnFire() != null || ) return false; }
+	 */
 
 	private boolean handleHeardFieryBuildings(int time) {
-		for(EntityID destID: distancesToHelpOfotherFBs.keySet()) {
+		for (EntityID destID : distancesToHelpOfotherFBs.keySet()) {
 			Set<EntityID> helps = distanceToHelp.keySet();
-			if(helps.isEmpty())
+			if (helps.isEmpty())
 				break;
-			if(!helps.isEmpty() && helps.contains(destID)) {
+			if (!helps.isEmpty() && helps.contains(destID)) {
 				List<Integer> distances = new ArrayList<>(distancesToHelpOfotherFBs.get(destID));
 				Collections.sort(distances);
-				if(distances.get(1) >= distanceToHelp.get(destID)){
+				if (distances.get(1) >= distanceToHelp.get(destID)) {
 					List<EntityID> path = search.getPath(me().getPosition(), destID, null);
-					if(path != null) {
+					if (path != null) {
 						distanceToHelp.clear();
 						Road road = (Road) model.getEntity(destID);
-						sendMove(time, path,road.getX(),road.getY());
+						sendMove(time, path, road.getX(), road.getY());
 						return true;
 					}
 				}
-				
+
 			}
-			
+
 		}
 		distanceToHelp.clear();
 		boolean flag = false;
-		for(EntityID targetID : onFireBuildingsIDs) {
+		for (EntityID targetID : onFireBuildingsIDs) {
 			EntityID destID = ((EntityID[]) buildingEntrances.get(targetID).toArray())[0];
-			List<EntityID> path = search.getPath(me().getPosition(), destID,null);
-			if(path != null ){
-				int distance = getDistanceByPath(path,me());
-				Message message = new Message(MessageID.BUILDING_ON_FIRE,targetID,time,configuration.getFireChannel());
+			List<EntityID> path = search.getPath(me().getPosition(), destID, null);
+			if (path != null) {
+				int distance = getDistanceByPath(path, me());
+				Message message = new Message(MessageID.BUILDING_ON_FIRE, targetID, time,
+						configuration.getFireChannel());
 				messagesWillSend.add(message);
 				distanceToHelp.put(targetID, distance);
 				flag = true;
@@ -202,7 +211,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 				List<EntityID> path = search.getPath(me().getPosition(), destID, null);
 				if (path != null) {
 					Road road = (Road) model.getEntity(destID);
-					sendMove(time, path,road.getX(),road.getY());
+					sendMove(time, path, road.getX(), road.getY());
 					return true;
 				}
 			}
@@ -216,51 +225,12 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		extinguishedBuildingsIDs.addAll(extinguishedBuildingsIDs);
 		extinguishedBuildingsIDs.addAll(burnOutBuildingIDs);
 		for (EntityID extinguishedBuildingID : extinguishedBuildingsIDs) {
-			/*heatingBuildingsIDs.remove(extinguishedBuildingID);
-			burningBuildingsIDs.remove(extinguishedBuildingID);
-			InfernoBuildingsIDs.remove(extinguishedBuildingID);*/
+			/*
+			 * heatingBuildingsIDs.remove(extinguishedBuildingID);
+			 * burningBuildingsIDs.remove(extinguishedBuildingID);
+			 * InfernoBuildingsIDs.remove(extinguishedBuildingID);
+			 */
 			onFireBuildingsIDs.remove(extinguishedBuildingID);
-		}
-	}
-
-	private void sendAllRadioMessages(int time) {
-		for (Message message : messagesWillSend) {
-			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
-			sendSpeak(time, message.getChannel(), data.getBytes());
-		}
-		messagesWillSend.clear();
-	}
-
-	private void sendAllVoiceMessages(int time) {
-		for (Message message : messagesWillSend) {
-			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
-			sendSpeak(time, message.getChannel(), data.getBytes());
-		}
-		messagesWillSend.clear();
-	}
-
-	public void addInjuredHumanInfoToMessageSend(int time) {
-		for (Human human : seenChanges.getBuriedHuman()) {
-			Message message = new Message(MessageID.HUMAN_BURIED, human.getPosition(), time,
-					configuration.getAmbulanceChannel());
-			messagesWillSend.add(message);
-		}
-	}
-
-	public void addRoadsInfoToMessageSend(int time) {
-		for (Blockade blockade : seenChanges.getSeenBlockades()) {
-			Message message1 = new Message(MessageID.HUMAN_BLOCKED, blockade.getPosition(), time,
-					configuration.getPoliceChannel());
-			messagesWillSend.add(message1);
-		}
-		for (Blockade blockadeStuckedHuman : seenChanges.getBlockadesHumanStuckedIn()) {
-			Message message2 = new Message(MessageID.HUMAN_STUCKED, blockadeStuckedHuman.getPosition(), time,
-					configuration.getPoliceChannel());
-			messagesWillSend.add(message2);
-		}
-		for (EntityID roadID : seenChanges.getClearedRoads()) {
-			Message message3 = new Message(MessageID.ROAD_CLEARED, roadID, time, configuration.getPoliceChannel());
-			messagesWillSend.add(message3);
 		}
 	}
 
@@ -309,21 +279,14 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 
 	private void handleVoice(EntityID targetID, MessageID messageID) {
 		switch (messageID) {
-/*		case BUILDING_WARM:
-			warmBuildingsIDs.add(targetID);
-			break;
-		case BUILDING_HEATING:
-			heatingBuildingsIDs.add(targetID);
-			break;
-		case BUILDING_BURNING:
-			burningBuildingsIDs.add(targetID);
-			break;
-		case BUILDING_INFERNO:
-			InfernoBuildingsIDs.add(targetID);
-			break;*/
+		/*
+		 * case BUILDING_WARM: warmBuildingsIDs.add(targetID); break; case
+		 * BUILDING_HEATING: heatingBuildingsIDs.add(targetID); break; case
+		 * BUILDING_BURNING: burningBuildingsIDs.add(targetID); break; case
+		 * BUILDING_INFERNO: InfernoBuildingsIDs.add(targetID); break;
+		 */
 		case BUILDING_ON_FIRE:
-			
-		
+
 		case BUILDING_BURNT_OUT:
 			burnOutBuildingIDs.add(targetID);
 			break;
@@ -343,23 +306,16 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 
 	private void handleRadio(EntityID targetID, MessageID messageID) {
 		switch (messageID) {
-/*		case BUILDING_WARM:
-			warmBuildingsIDs.add(targetID);
-			break;
-		case BUILDING_HEATING:
-			heatingBuildingsIDs.add(targetID);
-			onFireBuildingsIDs.add(targetID);
-			break;
-		case BUILDING_BURNING:
-			burningBuildingsIDs.add(targetID);
-			onFireBuildingsIDs.add(targetID);
-			break;
-		case BUILDING_INFERNO:
-			InfernoBuildingsIDs.add(targetID);
-			onFireBuildingsIDs.add(targetID);
-			break;*/
+		/*
+		 * case BUILDING_WARM: warmBuildingsIDs.add(targetID); break; case
+		 * BUILDING_HEATING: heatingBuildingsIDs.add(targetID);
+		 * onFireBuildingsIDs.add(targetID); break; case BUILDING_BURNING:
+		 * burningBuildingsIDs.add(targetID); onFireBuildingsIDs.add(targetID);
+		 * break; case BUILDING_INFERNO: InfernoBuildingsIDs.add(targetID);
+		 * onFireBuildingsIDs.add(targetID); break;
+		 */
 		case BUILDING_ON_FIRE:
-		onFireBuildingsIDs.add(targetID);
+			onFireBuildingsIDs.add(targetID);
 		case BUILDING_EXTINGUISHED:
 			extinguishedBuildingsIDs.add(targetID);
 			break;

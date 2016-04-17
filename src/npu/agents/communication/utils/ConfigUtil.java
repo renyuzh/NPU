@@ -32,16 +32,15 @@ public class ConfigUtil {
 	private final ArrayList<VoiceChannel> voiceChannels = new ArrayList<VoiceChannel>();
 	private final ArrayList<RadioChannel> radioChannels = new ArrayList<RadioChannel>();
 
-	private int policeForcesCount, fireBrigadesCount, ambulanceTeamsCount,
-			policeOfficesCount, fireStationsCount, ambulanceCentersCount;
+	private int policeForcesCount, fireBrigadesCount, ambulanceTeamsCount, policeOfficesCount, fireStationsCount,
+			ambulanceCentersCount;
 
 	public ConfigUtil(rescuecore2.config.Config config) {
-		maxPlatoonSubscribeChannels = config.getIntValue(COMM_PREFIX
-				+ MAX_PLATOON_SUBSCRIBE_CHANNELS_KEY);
+		maxPlatoonSubscribeChannels = config.getIntValue(COMM_PREFIX + MAX_PLATOON_SUBSCRIBE_CHANNELS_KEY);
 
 		ignoreAgentCommand = config.getIntValue(kernel.KernelConstants.IGNORE_AGENT_COMMANDS_KEY);
 		// POLICE_FORCE RELATED
-		maxCleardistance = config.getIntValue(MAX_CLEAR_DISTANCE_KEY) * 3/4;
+		maxCleardistance = config.getIntValue(MAX_CLEAR_DISTANCE_KEY) * 3 / 4;
 
 		// FIRE_BRIGAE_RELATED
 		maxWater = config.getIntValue(MAX_WATER_KEY);
@@ -61,6 +60,7 @@ public class ConfigUtil {
 		fireStationsCount = config.getIntValue(StandardConstants.FIRE_STATION_COUNT_KEY);
 		ambulanceCentersCount = config.getIntValue(StandardConstants.AMBULANCE_CENTRE_COUNT_KEY);
 	}
+
 	public int getMaxPlatoonSubscribeChannels() {
 		return maxPlatoonSubscribeChannels;
 	}

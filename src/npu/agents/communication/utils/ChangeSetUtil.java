@@ -37,10 +37,10 @@ public class ChangeSetUtil {
 
 	private ArrayList<Hydrant> hydrants = new ArrayList<Hydrant>();
 	private ArrayList<Road> roads = new ArrayList<Road>();
-	
+
 	private Set<Blockade> blockades = new HashSet<Blockade>();
 	private Set<EntityID> clearedRoadsIDs = new HashSet<EntityID>();
-	
+
 	private ArrayList<Civilian> civilians = new ArrayList<Civilian>();
 	private ArrayList<PoliceForce> policeForces = new ArrayList<PoliceForce>();
 	private ArrayList<FireBrigade> fireBrigades = new ArrayList<FireBrigade>();
@@ -52,16 +52,16 @@ public class ChangeSetUtil {
 	private Set<EntityID> buildingsOnFire = new HashSet<EntityID>();
 	private Set<EntityID> buildingsExtinguished = new HashSet<EntityID>();
 	private Set<EntityID> buildingsBurtout = new HashSet<EntityID>();
-	
+
 	private Map<EntityID, BuildingStatus> buildingStatusMap = new HashMap<EntityID, BuildingStatus>();
 	private Map<EntityID, BuildingStatus> preBuildingStatusMap;
-	
+
 	private Set<EntityID> worseStatusBuildings = new HashSet<EntityID>();
 	private int preCountFieryBuildings;
 	private int countOfFieryBuildings;
 	private Set<Human> civilianInjured = new HashSet<Human>();
 	private Set<Human> platoonBuried = new HashSet<Human>();
-	//private Set<Blockade> blockadesAroundRefuge = new HashSet<Blockade>();
+	// private Set<Blockade> blockadesAroundRefuge = new HashSet<Blockade>();
 	private EntityID refugeID;
 
 	private Set<EntityID> buildingsHeating = new HashSet<EntityID>();
@@ -144,12 +144,12 @@ public class ChangeSetUtil {
 			}
 			if (isBuildingStatusWorse(building)) {
 				worseStatusBuildings.add(building.getID());
-				System.out.print(building.getID()+" building worse ");
+				System.out.print(building.getID() + " building worse ");
 			}
 			if (buildingStatus.isOnFire()) {
 				buildingsOnFire.add(building.getID());
 				countOfFieryBuildings++;
-				System.out.print(building.getID()+" building on Fire ");
+				System.out.print(building.getID() + " building on Fire ");
 			} else {
 				buildingsOnFire.remove(building.getID());
 			}
@@ -171,17 +171,19 @@ public class ChangeSetUtil {
 
 	public void analyzeHumans() {
 		for (Human human : humans) {
-			if(human instanceof Civilian && human.isHPDefined() && human.isDamageDefined() && human.isBuriednessDefined()
-					&& human.isPositionDefined() && human.getHP() > 0
-					&& (human.getBuriedness() > 0 || human.getDamage() > 0)){
+			if (human instanceof Civilian && human.isHPDefined() && human.isDamageDefined()
+					&& human.isBuriednessDefined() && human.isPositionDefined() && human.getHP() > 0
+					&& (human.getBuriedness() > 0 || human.getDamage() > 0)) {
 				civilianInjured.add(human);
 			}
-			if(human instanceof AmbulanceTeam || human instanceof PoliceForce || human instanceof FireBrigade && human.isHPDefined() && human.isDamageDefined() && human.isBuriednessDefined()
-					&& human.isPositionDefined() && human.getHP() > 0 && human.getBuriedness() > 0) 
+			if (human instanceof AmbulanceTeam || human instanceof PoliceForce
+					|| human instanceof FireBrigade && human.isHPDefined() && human.isDamageDefined()
+							&& human.isBuriednessDefined() && human.isPositionDefined() && human.getHP() > 0
+							&& human.getBuriedness() > 0)
 				platoonBuried.add(human);
-			}
-		
 		}
+
+	}
 
 	public boolean isBuildingStatusWorse(Building building) {
 		if (preBuildingStatusMap != null && preBuildingStatusMap.keySet().contains(building.getID())) {
@@ -191,8 +193,6 @@ public class ChangeSetUtil {
 		}
 		return false;
 	}
-
-
 
 	public Set<Blockade> getBlockadesHumanStuckedIn() {
 		Set<Blockade> blockades = new HashSet<Blockade>();
@@ -212,20 +212,13 @@ public class ChangeSetUtil {
 		return blockades;
 	}
 
-
-
-/*	public Set<Blockade> getSeenBlockadesAroundRefuge(Map<EntityID, Set<EntityID>> map) {
-		if (refugeID != null) {
-			for (Blockade blockade : getSeenBlockades()) {
-				if (map.keySet().contains(refugeID) && map.get(refugeID).contains(blockade.getPosition()))
-					blockadesAroundRefuge.add(blockade);
-			}
-		}
-		return blockadesAroundRefuge;
-	}*/
-
-
-
+	/*
+	 * public Set<Blockade> getSeenBlockadesAroundRefuge(Map<EntityID,
+	 * Set<EntityID>> map) { if (refugeID != null) { for (Blockade blockade :
+	 * getSeenBlockades()) { if (map.keySet().contains(refugeID) &&
+	 * map.get(refugeID).contains(blockade.getPosition()))
+	 * blockadesAroundRefuge.add(blockade); } } return blockadesAroundRefuge; }
+	 */
 
 	public boolean isBlocked(EntityID lastPosition, Human me, double lastPositionX, double lastPositionY) {
 		return (lastPosition != null && lastPosition.getValue() == me.getPosition().getValue()
@@ -408,10 +401,12 @@ public class ChangeSetUtil {
 		}
 		return null;
 	}
+
 	public void previousChangesClear() {
 		System.out.println("clear pre seenChanges");
-		
-		//TODO 这些到底是每次清空还是保存部分再更新
+
+		// TODO 这些到底是每次清空还是保存部分再更新
+		buildings.clear();
 		hydrants.clear();
 		roads.clear();
 		blockades.clear();
@@ -420,20 +415,29 @@ public class ChangeSetUtil {
 		policeForces.clear();
 		fireBrigades.clear();
 		ambulanceTeams.clear();
+		humans.clear();
 
-		//blockadesAroundRefuge.clear();
+		// blockadesAroundRefuge.clear();
 		refugeID = null;
 		buildingsUnburnt.clear();
 		buildingsIsWarm.clear();
 		buildingsExtinguished.clear();
-	    buildingsOnFire.clear();
-	    platoonBuried.clear();
-	    civilianInjured.clear();
+		buildingsOnFire.clear();
+		buildingsBurtout.clear();
+		platoonBuried.clear();
+		civilianInjured.clear();
 
 		buildingStatusMap.clear();
 		worseStatusBuildings.clear();
 		countOfFieryBuildings = 0;
+
+		buildingsHeating.clear();
+		buildingsBurning.clear();
+		buildingsInferno.clear();
+		clearedRoadsIDs.clear();
+		roadsNeedToClear.clear();
 	}
+
 	public Set<EntityID> getBuildingOnFireMore() {
 		if (preCountFieryBuildings < countOfFieryBuildings)
 			return buildingsOnFire;
@@ -447,6 +451,7 @@ public class ChangeSetUtil {
 	public Set<EntityID> getBuildingBurtOut() {
 		return buildingsBurtout;
 	}
+
 	public Set<EntityID> getClearedRoads() {
 		return clearedRoadsIDs;
 	}
@@ -474,6 +479,7 @@ public class ChangeSetUtil {
 	public Set<EntityID> getBuildingsInferno() {
 		return buildingsInferno;
 	}
+
 	public Set<Human> getInjuredCivilians() {
 		return civilianInjured;
 	}
@@ -481,6 +487,7 @@ public class ChangeSetUtil {
 	public Set<Human> getBuriedPlatoons() {
 		return platoonBuried;
 	}
+
 	public Set<Human> getInjuredHumans() {
 		Set<Human> humans = new HashSet<Human>();
 		humans.addAll(getInjuredCivilians());
@@ -491,6 +498,7 @@ public class ChangeSetUtil {
 	public Set<Blockade> getSeenBlockades() {
 		return blockades;
 	}
+
 	public EntityID getRefugeID() {
 		return refugeID;
 	}

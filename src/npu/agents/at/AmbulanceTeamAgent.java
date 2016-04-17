@@ -112,6 +112,12 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 		addBuildingInfoToMessageSend(time);
 		addRoadsInfoToMessageSend(time);
 		updateHelpedHuman();
+		EntityID position = positionWhereIStuckedIn(seenChanges.getSeenBlockades(), me());
+		if (position != null) {
+			Message message = new Message(MessageID.PLATOON_STUCKED, position, time, configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+			return;
+		}
 		if (me().isHPDefined() && me().isDamageDefined() && me().getHP() > 0 && me().getDamage() > 0) {
 			if (canMoveToRefuge(time, me(), refugesEntrancesMap)) {
 			} else {
@@ -134,8 +140,8 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 			pathByPriotity.add(templist.get(0));
 		}
 
-		if(!basicRescue(time)){
-			System.out.println(me().getID()+" basic rescue failed");
+		if (!basicRescue(time)) {
+			System.out.println(me().getID() + " basic rescue failed");
 			List<EntityID> path = randomWalk(buildingsAndRoadsInCluster);
 			if (path != null) {
 				sendMove(time, path);
@@ -144,7 +150,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 	}
 
 	private void updateHelpedHuman() {
-		if(seenChanges.getInjuredHumans().size() <=1){
+		if (seenChanges.getInjuredHumans().size() <= 1) {
 			injuredCiviliansPositions.remove(me().getPosition());
 			buriedPlatoonsPositions.remove(me().getPosition());
 		}
@@ -241,7 +247,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 			// Am I at a refuge?
 			if (location() instanceof Refuge) {
 				// Unload!
-				System.out.println(me().getID()+" is Unloading");
+				System.out.println(me().getID() + " is Unloading");
 				sendUnload(time);
 				return true;
 			} else {
@@ -268,7 +274,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 	private boolean isRescuing(ChangeSetUtil seen) {
 		for (Human next : seenChanges.getInjuredHumans()) {
 			if (next.getPosition().equals(getID())) {
-				System.out.println(next + " is on board of "+me().getID());
+				System.out.println(next + " is on board of " + me().getID());
 				return true;
 			}
 		}
@@ -280,13 +286,13 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 			// Targets in the same place might need rescueing or loading
 			if ((next instanceof Human) && next.getBuriedness() == 0 && !(location() instanceof Refuge)) {
 				// Load
-				System.out.println(me().getID()+"is Loading " + next);
+				System.out.println(me().getID() + "is Loading " + next);
 				sendLoad(time, next.getID());
 				return true;
 			}
 			if (next.getBuriedness() > 0) {
 				// Rescue
-				System.out.println(me().getID()+"is Rescueing " + next);
+				System.out.println(me().getID() + "is Rescueing " + next);
 				sendRescue(time, next.getID());
 				return true;
 			}
