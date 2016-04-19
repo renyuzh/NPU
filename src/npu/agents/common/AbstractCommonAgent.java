@@ -223,7 +223,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 					}
 					current = next;
 					found = true;
-					System.out.print("在该簇内的道路遍历");
+				//	System.out.print("在该簇内的道路遍历");
 					break;
 				}
 			}
@@ -296,6 +296,7 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 				Y.add(blockade.getApexes()[i + 1]);
 			}
 			if (in_or_out_of_polygon(X, Y, me.getX(), me.getY())) {
+				System.out.println(me().getID()+" 我就这样被无情的困死了，救命啊");
 				return blockade.getPosition();
 			}
 		}

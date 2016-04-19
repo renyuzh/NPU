@@ -149,7 +149,7 @@ public   class ChangeSetUtil {
 			if (buildingStatus.isOnFire()) {
 				buildingsOnFire.add(building.getID());
 				countOfFieryBuildings++;
-				System.out.print(building.getID() + " building on Fire ");
+				System.out.println(building.getID() + " building on Fire ");
 			} else {
 				buildingsOnFire.remove(building.getID());
 			}
@@ -248,29 +248,53 @@ public   class ChangeSetUtil {
 		return blockadesOnRoad;
 	}
 
-	public synchronized  Set<Road> getTotallyBlockedRoad() {
+	public synchronized  Set<Road> getTotallyBlockedMainRoad() {
 		Set<Road> blockedRoads = new HashSet<Road>();
 		for (Road r : roads) {
-			if (isBlockingRoadTotally(r)) {
+			if (isBlockingMainRoadTotally(r)) {
 				blockedRoads.add(r);
+				System.out.println(r.getID()+" 主干道被完全堵住");
+			}
+		}
+		return blockedRoads;
+	}
+	public synchronized Set<Road> getTotallyBlockedBuildingEntrance() {
+		Set<Road> blockedRoads = new HashSet<Road>();
+		for (Road r : roads) {
+			if (!isBlockingMainRoadTotally(r)) {
+				blockedRoads.add(r);
+				System.out.println(r.getID()+" 道路附近建筑入口被完全堵住");
 			}
 		}
 		return blockedRoads;
 	}
 
-	public synchronized  boolean isBlockingRoadTotally(Road road) {
+	public synchronized  boolean isBlockingMainRoadTotally(Road road) {
 		List<Blockade> blockadesOnRoad = getSeenBlockadesOnRoad(road);
 		for (Blockade blockade : blockadesOnRoad) {
 			int[] vertices = mergeAdjacentBlockades(blockade, blockadesOnRoad, 2000);
 			for (Edge roadEdge : road.getEdges()) {
 				if (roadEdge.isPassable()) {
 					if (!openRoadEdge(road, roadEdge, vertices, 2000)) {
-						return true;
+						for(Building building : buildings) {
+							List<EntityID> neirs = building.getNeighbours();
+							for(EntityID neir:neirs){
+								StandardEntity entity = world.getEntity(neir);
+								if((entity instanceof Road) && entity.getID().equals(road.getID())){
+									return false;
+								}
+							}
+						}
+						/*EntityID neir = roadEdge.getNeighbour();
+						StandardEntity entity = world.getEntity(neir);
+						if(entity instanceof Road){
+							return true;
+						}*/
 					}
 				}
 			}
 		}
-		return false;
+		return true;
 	}
 
 	/**

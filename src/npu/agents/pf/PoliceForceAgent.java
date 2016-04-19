@@ -2,6 +2,7 @@ package npu.agents.pf;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -15,6 +16,7 @@ import npu.agents.common.AbstractCommonAgent;
 import npu.agents.communication.model.Message;
 import npu.agents.communication.utils.ChangeSetUtil;
 import npu.agents.communication.utils.CommUtils.MessageID;
+import npu.agents.utils.DistanceSorter;
 import npu.agents.utils.KConstants;
 import npu.agents.utils.Point;
 import rescuecore2.log.Logger;
@@ -25,7 +27,9 @@ import rescuecore2.misc.geometry.Point2D;
 import rescuecore2.misc.geometry.Vector2D;
 import rescuecore2.standard.entities.Area;
 import rescuecore2.standard.entities.Blockade;
+import rescuecore2.standard.entities.Building;
 import rescuecore2.standard.entities.Civilian;
+import rescuecore2.standard.entities.Edge;
 import rescuecore2.standard.entities.Human;
 import rescuecore2.standard.entities.PoliceForce;
 import rescuecore2.standard.entities.Refuge;
@@ -37,15 +41,16 @@ import rescuecore2.worldmodel.ChangeSet;
 import rescuecore2.worldmodel.EntityID;
 
 public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
-	private int distance;
+	private int maxClearDistance;
 	private Cluster cluster;
-	private Set<EntityID> roadsUnexplored;
+	private Set<EntityID> roadsUnexplored = new HashSet<EntityID>();
 	private Set<EntityID> roadsExplored = new HashSet<EntityID>();
 	private Set<EntityID> positionsBlockedCivilians = new HashSet<EntityID>();
 	private Set<EntityID> positionsBlockedPlatoon = new HashSet<EntityID>();
 	// private Set<EntityID> positionsBlockedRefuge = new HashSet<EntityID>();
 	private Set<EntityID> positionsStuckedHuman = new HashSet<EntityID>();
-	private Set<EntityID> positionsBlockdedRoadsTotally = new HashSet<EntityID>();
+	private Set<EntityID> positionsBlockdedMainRoadsTotally = new HashSet<EntityID>();
+	private Set<EntityID> buildingsEntrancesHumanStuckedIn = new HashSet<EntityID>();
 	private Set<EntityID> roadsInCluster;
 	private Set<EntityID> buildingsInCluster;
 	private Map<EntityID, Set<EntityID>> refugesEntrancesMap;
@@ -68,9 +73,13 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			}
 			buildingsInCluster = cluster.getBuildingsIDs();
 			roadsInCluster = cluster.getRoadsInCluster();
-			roadsUnexplored = cluster.getRoadsInCluster();
+			//roadsUnexplored = cluster.getRoadsInCluster();这样两者都指向相同的地方了
+		    Iterator<EntityID>	iter = roadsInCluster.iterator();
+			while(iter.hasNext()){
+				roadsUnexplored.add(iter.next());
+			}
 			refugesEntrancesMap = cluster.getRoadARoundRefuge();
-			distance = configuration.getMaxCleardistance();
+			maxClearDistance = configuration.getMaxCleardistance();
 			seenChanges = new ChangeSetUtil();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -115,20 +124,25 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			System.out.println(me().getID() + " is buried,hp is" + me().getHP() + ",damage is" + me().getDamage());
 		}
 		List<EntityID> templist = new ArrayList<EntityID>();
-		if (!positionsBlockdedRoadsTotally.isEmpty()) {
-			templist.addAll(positionsBlockdedRoadsTotally);
+		if(!buildingsEntrancesHumanStuckedIn.isEmpty()){
+			templist.addAll(buildingsEntrancesHumanStuckedIn);
 			distanceSort(templist, me());
 			pathByPriotity = search.getPath(me().getPosition(), templist.get(0), null);
-		} /*
+		}else if (!positionsStuckedHuman.isEmpty()) {
+			templist.addAll(positionsStuckedHuman);
+			distanceSort(templist, me());
+			pathByPriotity = search.getPath(me().getPosition(), templist.get(0), null);
+		} 
+		 /*
 			 * else if (!positionsBlockedRefuge.isEmpty()) {
 			 * templist.addAll(positionsBlockedRefuge); distanceSort(templist,
 			 * me()); pathByPriotity = search.getPath(me().getPosition(),
 			 * templist.get(0), null); }
-			 */else if (!positionsStuckedHuman.isEmpty()) {
-			templist.addAll(positionsStuckedHuman);
-			distanceSort(templist, me());
-			pathByPriotity = search.getPath(me().getPosition(), templist.get(0), null);
-		} else if (!positionsBlockedPlatoon.isEmpty()) {
+			 */else if (!positionsBlockdedMainRoadsTotally.isEmpty()) {
+					templist.addAll(positionsBlockdedMainRoadsTotally);
+					distanceSort(templist, me());
+					pathByPriotity = search.getPath(me().getPosition(), templist.get(0), null);
+				}else if (!positionsBlockedPlatoon.isEmpty()) {
 			templist.addAll(positionsBlockedPlatoon);
 			distanceSort(templist, me());
 			pathByPriotity = search.getPath(me().getPosition(), templist.get(0), null);
@@ -141,9 +155,9 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		 * if (clearBlockadesAroundRefuge(time, seenChanges)) { return; } else {
 		 */
 		basicClear(time, seenChanges);
-		if(somethingWrong(time)) {
+	/*	if(somethingWrong(time)) {
 			return;
-		}
+		}*/
 		// }
 	}
 
@@ -155,7 +169,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 			positionsBlockedCivilians.remove(clearedRoadID);
 			positionsBlockedPlatoon.remove(clearedRoadID);
 			// positionsBlockedRefuge.remove(clearedRoadID);
-			positionsBlockdedRoadsTotally.remove(clearedRoadID);
+			positionsBlockdedMainRoadsTotally.remove(clearedRoadID);
 		}
 	}
 
@@ -228,8 +242,11 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		/*
 		 * case REFUGE_BLOCKED: positionsBlockedRefuge.add(positionID);
 		 */
-		case ROAD_BLOCKED_TOTALLY:
-			positionsBlockdedRoadsTotally.add(positionID);
+		case MAIN_ROAD_BLOCKED_TOTALLY:
+			positionsBlockdedMainRoadsTotally.add(positionID);
+			break;
+		case ENTRANCE_BLOCKED_TOTALLY:
+			buildingsEntrancesHumanStuckedIn.add(positionID);
 			break;
 		default:
 			break;
@@ -251,31 +268,72 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 
 	private void addAllClearedRoadsBack() {
 		if (roadsUnexplored.size() == 0) {
-			Iterator<EntityID> roadsID = roadsExplored.iterator();
+			Iterator<EntityID> roadsID = roadsInCluster.iterator();
+			System.out.println("roads size  "+roadsInCluster.size());
 			while (roadsID.hasNext()) {
-				roadsUnexplored.add(roadsID.next());
+				EntityID roadID = roadsID.next();
+				System.out.println("add roads in cluster back "+roadID);
+				roadsUnexplored.add(roadID);
 			}
-			roadsExplored.clear();
-			System.out.println(me().getID() + " addAllClearedRoadsBack");
+			System.out.println(me().getID() + " addAllClearedRoadsBack"+roadsInCluster.size());
 		}
 	}
 
 	private void basicClear(int time, ChangeSetUtil seenChanges) {
-		if (clearNearBlockes(time))
-			return;
-		if (moveToSeenBlockade(time, seenChanges.getSeenBlockades())) {
-			return;
-		} else if (pathByPriotity != null) {
+/*		List<Blockade> targets = new ArrayList<Blockade>(seenChanges.getSeenBlockades());
+		Collections.sort(targets, new DistanceSorter(location(), model));
+		for(Blockade target : targets) {
+			if (clearNearBlockes(time,target)){
+				System.out.println();
+				return;
+			}
+			if (moveToSeenBlockade(time, target)) {
+				System.out.println();
+				return;
+			}
+		}
+		System.out.println(me().getID()+"看不到任何路障 : "+targets.size());
+		if (pathByPriotity != null) {
 			sendMove(time, pathByPriotity);
 			pathByPriotity = null;
+			System.out.println();
 			return;
 		} else {
 			boolean traverslOk = traversalRoads(time);
 			if (!traverslOk) {
 				List<EntityID> path = randomWalk(roadsInCluster);
-				System.out.println(me().getID() + " random walk in cluster");
-				if (path != null)
+				if (path != null){
+					System.out.println(me().getID() + " random walk in cluster");
 					sendMove(time, path);
+				}
+				System.out.println(me().getID()+" random walk failed");
+			}
+			System.out.println();
+			return;
+		}*/
+		if (clearNearBlockes(time)){
+			System.out.println();
+			return;
+		}
+		if (moveToSeenBlockade(time)) {
+			System.out.println();
+			return;
+		} else if (pathByPriotity != null) {
+			sendMove(time, pathByPriotity);
+			pathByPriotity = null;
+			System.out.println();
+			return;
+		} else {
+			boolean traverslOk = traversalRoads(time);
+			System.out.println();
+			if (!traverslOk) {
+				List<EntityID> path = randomWalk(roadsInCluster);
+				if (path != null){
+					System.out.println(me().getID() + " random walk in cluster");
+					System.out.println();
+					sendMove(time, path);
+				}
+				System.out.println();
 			}
 			return;
 		}
@@ -283,6 +341,11 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 
 	private boolean clearNearBlockes(int time) {
 		Blockade target = getTargetBlockade();
+		/*int distance = findDistanceTo(target,me().getX(),me().getY());
+		if(distance > maxClearDistance){
+			System.out.println(me().getID() + " 距路障最短距离" + distance+"大于最大清障距离");
+			return false;
+		}*/
 		if (target != null) {
 			List<Line2D> lines = GeometryTools2D.pointsToLines(GeometryTools2D.vertexArrayToPoints(target.getApexes()),
 					true);
@@ -306,28 +369,76 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		return false;
 	}
 
-	private boolean moveToSeenBlockade(int time, Set<Blockade> blockades) {
-		List<EntityID> nearPath = search.getPath(me().getPosition(), getBlockedArea(blockades), null);
-		if (nearPath != null) {
-			Road r = (Road) model.getEntity(nearPath.get(nearPath.size() - 1));
-			Blockade b = getTargetBlockade(r, -1);
-			if (b != null) {
-				sendMove(time, nearPath, b.getX(), b.getY());
-				System.out.println(me().getID() + " 移动到视力所及的有路障的地方");
-				return true;
-			}
+	private boolean moveToSeenBlockade(int time) {
+		/*List<Blockade> targets = new ArrayList<Blockade>(blockades);
+		List<EntityID> path = new ArrayList<EntityID>();
+		Collections.sort(targets, new DistanceSorter(location(), model));*/
+		Blockade target = getSeenFarBlockade();
+		if(target == null ){
+			System.out.println(me().getID()+" 没有看到任何路障");
+			return false;
 		}
+		Point2D closest = findClosestPoint(target,me().getX(),me().getY());
+		List<EntityID> path = new ArrayList<EntityID>();
+			if(target.getPosition().equals(me().getPosition())){
+				System.out.println("blockade "+target.getID()+"and human "+me().getID()+" is at same position "+me().getPosition());
+				path.add(me().getPosition());
+				sendMove(time,path,(int)closest.getX(),(int)closest.getY());
+				return true;
+			}else{
+				path = search.getPath(me().getPosition(), target.getPosition(), null);
+				for(EntityID test : path){
+					System.out.print(test.getValue()+":"+me().getPosition()+" ");
+				}
+				if (path != null) {
+						//sendMove(time,path,target.getX(),target.getY());
+					if(somethingWrong()){
+						path.clear();
+						path.add(nowPosition);
+						Area entity = (Area) model.getEntity(nowPosition);
+						if(entity instanceof Road) {
+							Road road = (Road)entity;
+							boolean flag = false;
+							int x = 0,y =0;
+							for(Edge edge :road.getEdges()){
+								if(edge.isPassable()){
+									StandardEntity neirEntity = model.getEntity(edge.getNeighbour());
+									if(neirEntity instanceof Building){
+										flag = true;
+										continue;
+									} 
+									else{
+										 x = (edge.getStartX()+edge.getEndX())/2;
+										 y = (edge.getStartY()+edge.getEndY())/2;
+									}
+								}
+							}
+							if(flag && x!=0 && y!=0){
+								sendMove(time,path,x,y);
+								System.out.println(me().getID()+"往边的中间移动");
+								return true;
+							}
+						}
+					}
+					    sendMove(time,path,(int)closest.getX(),(int)closest.getY());
+						System.out.println(me().getID() + " 移动到视力所及的不在同一条路上的有路障的地方");
+						return true;
+				}
+			}
+		if(path == null || path.size()==0)
+			System.out.println(me().getID()+" 就在眼前的路障移动不过去");
 		return false;
 	}
 
 	private boolean traversalRoads(int time) {
 		if (roadsUnexplored.size() != 0) {
 			List<EntityID> roadsIDs = new ArrayList<EntityID>(roadsUnexplored);
+			System.out.println("roadsUnexplored has "+roadsIDs.size());
 			distanceSort(roadsIDs, me());
 			List<EntityID> path = search.getPath(me().getPosition(), roadsIDs.get(0), null);
 			if (path != null) {
 				System.out.println(me().getID() + " 遍历道路,非随机");
-				System.out.println();
+				roadsUnexplored.removeAll(path);
 				Road r = (Road) model.getEntity(roadsIDs.get(0));
 				sendMove(time, path, r.getX(), r.getY());
 				return true;
@@ -342,29 +453,67 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		int y = me().getY();
 		EntityID closestRoad = null;
 		for (Blockade blockade : seenBlockades) {
+			
 			EntityID positionID = blockade.getPosition();
 			StandardEntity positionEntity = model.getEntity(positionID);
-			if (!(positionEntity instanceof Road))
+			if (!(positionEntity instanceof Road)){
+				System.out.println(me().getID()+" 路障竟然不在道路上");
 				continue;
+			}
 			int distance = findDistanceTo(blockade, x, y);
 			if (distance < minDistance) {
 				minDistance = distance;
 				closestRoad = positionID;
 			}
 		}
+		if(closestRoad == null)
+		System.out.println(me().getID()+" 看不到任何路障");
 		return closestRoad;
 	}
+	
 
+	private Blockade getSeenFarBlockade(){
+		Area location = (Area) location();
+		if(!(location instanceof Road))
+			return null;
+		Blockade result = getTargetBlockade(location, -1);
+		if (result != null) {
+			System.out.println(me().getID() + " 移动到同一条路 "+result.getID()+" 看到但清理不到的路障 ");
+			return result;
+		}
+		for (EntityID next : location.getNeighbours()) {
+			location = (Area) model.getEntity(next);
+			if(!(location instanceof Road))
+				continue;
+			result = getTargetBlockade(location, -1);
+			if (result != null) {
+				System.out.println(me().getID() + " 移动到另一条路上 "+result.getID()+" 看到但清理不到的路障 ");
+				return result;
+			}
+		}
+		List<Blockade> otherBlockades = new ArrayList<Blockade>(seenChanges.getSeenBlockades());
+		Collections.sort(otherBlockades, new DistanceSorter(location(), model));
+		if(!otherBlockades.isEmpty()){
+			System.out.println(me().getID()+" 在当前路和和它的邻近路都没有看到路障，在其它地方看到了");
+			return otherBlockades.get(0);
+		}
+		return null;
+	}
 	private Blockade getTargetBlockade() {
 		Area location = (Area) location();
-		Blockade result = getTargetBlockade(location, distance);
+		if(!(location instanceof Road))
+			return null;
+		Blockade result = getTargetBlockade(location, maxClearDistance);
 		if (result != null) {
 			return result;
 		}
 		for (EntityID next : location.getNeighbours()) {
 			location = (Area) model.getEntity(next);
-			result = getTargetBlockade(location, distance);
+			if(!(location instanceof Road))
+				continue;
+			result = getTargetBlockade(location, maxClearDistance);
 			if (result != null) {
+				System.out.println(me().getID()+" 能清理到的路障在另一条路上");
 				return result;
 			}
 		}
@@ -382,12 +531,12 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		for (EntityID next : ids) {
 			Blockade b = (Blockade) model.getEntity(next);
 			int d = findDistanceTo(b, x, y);
-			if (maxDistance < 0 && d != 0) {
-				System.out.println(me().getID() + " 移动到能看到的最短距离" + d);
+			if (maxDistance < 0 ) {
+				System.out.println(me().getID() + " 看到但清理不到的路障 " + b.getID()+" 最短距离 "+d);
 				return b;
 			}
-			if (d < maxDistance) {
-				System.out.println(me().getID() + " 距路障最短距离" + d);
+			if (d <= maxDistance) {
+				System.out.println(me().getID() + " 距能清理的路障 "+b.getID()+" 最短距离" + d);
 				return b;
 			}
 		}
@@ -397,7 +546,7 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 	private int findDistanceTo(Blockade b, int x, int y) {
 		List<Line2D> lines = GeometryTools2D.pointsToLines(GeometryTools2D.vertexArrayToPoints(b.getApexes()), true);
 		double best = Double.MAX_VALUE;
-		Point origin = new Point(x, y);
+		Point2D origin = new Point2D(x, y);
 		// 算距离最近的点
 		for (Line2D next : lines) {
 			Point2D closest = GeometryTools2D.getClosestPointOnSegment(next, origin);
@@ -408,6 +557,23 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		}
 		return (int) best;
 	}
+	private Point2D findClosestPoint(Blockade b, int x, int y) {
+		List<Line2D> lines = GeometryTools2D.pointsToLines(GeometryTools2D.vertexArrayToPoints(b.getApexes()), true);
+		double best = Double.MAX_VALUE;
+		Point2D origin = new Point2D(x, y);
+		Point2D closest = null;
+		// 算距离最近的点
+		for (Line2D next : lines) {
+			Point2D near = GeometryTools2D.getClosestPointOnSegment(next, origin);
+			double d = GeometryTools2D.getDistance(origin, near);
+			if (d < best) {
+				best = d;
+				closest = near;
+			}
+		}
+		return closest;
+	}
+   
 
 	@Override
 	public EnumSet<StandardEntityURN> getRequestedEntityURNsEnum() {
@@ -504,21 +670,16 @@ public class PoliceForceAgent extends AbstractCommonAgent<PoliceForce> {
 		}
 		messagesWillSend.clear();
 	}
-	private boolean somethingWrong(int time){
+	private boolean somethingWrong(){
 		prePosition[1] = prePosition[0];
 		prePosition[0] = nowPosition;
 		nowPosition = me().getPosition();
 		if(prePosition[0] != null && prePosition[1] != null &&  nowPosition != null
-				&& nowPosition.equals(prePosition[0])&& prePosition[0].equals(prePosition[1]))
+				&& nowPosition.equals(prePosition[0]) && prePosition[0].equals(prePosition[1]))
 		{
-			List<EntityID> path = randomWalk(areaIDs);
-			if(path != null) {
-				sendMove(time, path);
-				System.out.println("something is wrong for fb of "+ me().getID());
-				prePosition[0] =null;
-				prePosition[1] = null;
-			  nowPosition = null;
-			}
+			prePosition[0] = null;
+			prePosition[1] = null;
+			return true;
 		}
 			return false;
 	}

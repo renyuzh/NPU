@@ -23,7 +23,9 @@ public class BuildingStatus {
 	public boolean isOnFire() {
 		if (building.isFierynessDefined() && building.isOnFire()
 				&& building.getFierynessEnum() != StandardEntityConstants.Fieryness.BURNT_OUT)
+		{
 			return true;
+		}
 		return false;
 	}
 

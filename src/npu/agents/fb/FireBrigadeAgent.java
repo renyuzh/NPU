@@ -66,7 +66,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	public void postConnect() {
 		super.postConnect();
 		try {
-			ClustingMap2.initMap(Math.min(KConstants.countOffb,configuration.getAmbulanceTeamsCount()), 100, model);
+			ClustingMap2.initMap(Math.min(KConstants.countOffb,configuration.getFireBrigadesCount()), 100, model);
 			cluster = ClustingMap2.assignAgentToCluster(me(), model);
 			if (cluster == null) {
 				System.out.println("该agent没有分配到cluster");
@@ -101,35 +101,36 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 			sendSubscribe(time, configuration.getFireChannel());// 注册了该通道的都可以接收到
 			if (me().isHPDefined() && me().isBuriednessDefined() && me().getHP() > 0 && me().getBuriedness() > 0) {
 				// TODO 暂时不管
-				callForATHelp(time, MessageID.AT_BURIED);
+				callForATHelp(time, MessageID.FB_BURIED);
 				System.out.println(me().getID() + " is buried,hp is" + me().getHP());
 			}
 			return;
 		}
+		System.out.println(me().getID()+" 我可以清理的最远距离 "+maxDistance);
 		handleHeard(time, heard);
 		seenChanges.handleChanges(model, changes);
 		callOtherFBHelp(time);
 		addInjuredHumanInfoToMessageSend(time);
 		addRoadsInfoToMessageSend(time);
-		updateExtinguishedBuildings(time);
-		if (somethingWrong(time)){
-		}
-		EntityID position = positionWhereIStuckedIn(seenChanges.getSeenBlockades(), me());
+/*		updateExtinguishedBuildings(time);*/
+		/*if (somethingWrong(time)){
+		}*/
+		/*EntityID position = positionWhereIStuckedIn(seenChanges.getSeenBlockades(), me());
 		if (position != null) {
 			Message message = new Message(MessageID.PLATOON_STUCKED, position, time, configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 			return;
-		}
-		if (me().isHPDefined() && me().isDamageDefined() && me().getHP() > 0 && me().getDamage() > 0) {
+		}*/
+		/*if (me().isHPDefined() && me().isDamageDefined() && me().getHP() > 0 && me().getDamage() > 0) {
 			if (canMoveToRefuge(time, me(), refugesEntrancesMap)) {
 			} else {
 				callForATHelp(time, MessageID.PLATOON_BURIED);
 			}
 			System.out.println(me().getID() + " is buried,hp is" + me().getHP() + ",damage is" + me().getDamage());
-		}
-		if (isFillingWater(time))
+		}*/
+/*		if (isFillingWater(time))
 			return;
-		if (roadBlockedTotally(time)) {
+		if (mainRoadBlockedTotally(time)) {
 			sendRest(time);
 			return;
 		}
@@ -137,19 +138,23 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 			return;
 		}
 		if (handleSeenFieryBuildings(time))
-			return;
-		if (handleHeardFieryBuildings(time)) {
+			return;*/
+		/*if (handleHeardFieryBuildings(time)) {
 			return;
 		}
-		distancesToHelpOfotherFBs.clear();
+		distancesToHelpOfotherFBs.clear();*/
 		/*
 		 * if (changeClusterToHelpOtherFB(time)) {
 		 * 
 		 * }
 		 */
-		List<EntityID> path = randomWalk(roadIDs);
-		if (path != null)
+		/*List<EntityID> path = randomWalk(areaIDs);
+		if (path != null){
 			sendMove(time, path);
+			System.out.println(me().getID()+" see no targets,random walk");
+			return;
+		}
+		System.out.println(me().getID()+" see no targets,random walk failed");*/
 
 	}
 
@@ -212,22 +217,20 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	}
 
 	private boolean handleSeenFieryBuildings(int time) {
-		if (me().getWater() == 0)
-			return false;
 		List<EntityID> fieryBuildingsIDs = new ArrayList<>(seenChanges.getBuildingsOnFire());
 		distanceSort(fieryBuildingsIDs, me());
 		for (EntityID next : fieryBuildingsIDs) {
 			if (model.getDistance(getID(), next) <= maxDistance) {
-				Logger.info("Extinguishing " + next);
+				System.out.println(me().getID()+" is Extinguishing " + next);
 				sendExtinguish(time, next, Math.min(me().getWater(), maxPower));
-				sendSpeak(time, 1, ("Extinguishing " + next).getBytes());
+				//sendSpeak(time, 1, ("Extinguishing " + next).getBytes());
 				return true;
 			} else {
 				EntityID destID = ((EntityID[]) buildingEntrances.get(next).toArray())[0];
 				List<EntityID> path = search.getPath(me().getPosition(), destID, null);
 				if (path != null) {
-					Road road = (Road) model.getEntity(destID);
-					sendMove(time, path, road.getX(), road.getY());
+					sendMove(time, path);
+					System.out.println(me().getID()+" is moving to seen fiery buildings");
 					return true;
 				}
 			}
@@ -354,18 +357,11 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		}
 	}
 
-	private boolean handleWater(int time) {
-		if (isFillingWater(time))
-			return true;
-		if (moveForWater(time))
-			return true;
-		return false;
-	}
-
 	private boolean isFillingWater(int time) {
 		if (me().isWaterDefined() && me().getWater() < maxWater
 				&& (location() instanceof Refuge || location() instanceof Hydrant)) {
 			sendRest(time);
+			System.out.println(me().getID()+" is filling water at "+me().getPosition());
 			return true;
 		}
 		return false;
@@ -374,6 +370,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	public boolean moveForWater(int time) {
 		// Are we out of water?
 		if (me().isWaterDefined() && me().getWater() == 0) {
+			System.out.println(me().getID()+" is out of water");
 			List<EntityID> refugeIDs = new ArrayList<EntityID>(getEntrancesOfRefuges().keySet());
 			distanceSort(refugeIDs, me());
 			EntityID destRefugeID = ((EntityID[]) getEntrancesOfRefuges().get(refugeIDs.get(0)).toArray())[0];
@@ -388,7 +385,16 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 				if (path != null) {
 					Hydrant hydrant = (Hydrant) model.getEntity(destHydrantID);
 					sendMove(time, path, hydrant.getX(), hydrant.getY());
+					System.out.println(me().getID()+" is moving for hydrant");
 					return true;
+				}else{
+					path = randomWalk(areaIDs);
+					if(path != null){
+						sendMove(time,path);
+						System.out.println(me().getID()+" move for hydrant failed");
+					}else{
+						System.out.println(me().getID()+" randomly move for hydrant failed");
+					}
 				}
 			} else {
 				path = search.getPath(me().getPosition(), destRefugeID, null);
@@ -396,7 +402,16 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 					path.add(refugeIDs.get(0));
 					Refuge refuge = (Refuge) model.getEntity(refugeIDs.get(0));
 					sendMove(time, path, refuge.getX(), refuge.getY());
+					System.out.println(me().getID()+"is moving for refuge");
 					return true;
+				}else{
+					path = randomWalk(areaIDs);
+					if(path != null){
+						sendMove(time,path);
+						System.out.println(me().getID()+" move for refuge failed");
+					}else{
+						System.out.println(me().getID()+" randomly move for refuge failed");
+					}
 				}
 			}
 		}
@@ -408,12 +423,13 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		return EnumSet.of(StandardEntityURN.FIRE_BRIGADE);
 	}
 
-	public boolean roadBlockedTotally(int time) {
-		Set<Road> totallyBlockedRoads = seenChanges.getTotallyBlockedRoad();
+	public boolean mainRoadBlockedTotally(int time) {
+		Set<Road> totallyBlockedRoads = seenChanges.getTotallyBlockedMainRoad();
 		for (Road totallyBlockedRoad : totallyBlockedRoads) {
-			Message message = new Message(MessageID.ROAD_BLOCKED_TOTALLY, totallyBlockedRoad.getID(), time,
+	/*		Message message = new Message(MessageID.ROAD_BLOCKED_TOTALLY, totallyBlockedRoad.getID(), time,
 					configuration.getPoliceChannel());
-			messagesWillSend.add(message);
+			messagesWillSend.add(message);*/
+			System.out.println(totallyBlockedRoad.getID()+"road is blocked totally,"+me().getID()+" need pf help");
 			return true;
 		}
 		return false;
@@ -515,8 +531,14 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 		}
-		for (Road road : seenChanges.getTotallyBlockedRoad()) {
-			Message message = new Message(MessageID.ROAD_BLOCKED_TOTALLY, road.getID(), time,
+		for (Road road : seenChanges.getTotallyBlockedBuildingEntrance()) {
+			Message message = new Message(MessageID.ENTRANCE_BLOCKED_TOTALLY, road.getID(), time,
+					configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+		}
+		
+		for (Road road : seenChanges.getTotallyBlockedMainRoad()) {
+			Message message = new Message(MessageID.MAIN_ROAD_BLOCKED_TOTALLY, road.getID(), time,
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 		}

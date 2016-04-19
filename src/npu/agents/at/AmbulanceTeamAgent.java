@@ -323,7 +323,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 	}
 
 	public boolean blockadesBlockRoadTotally(int time) {
-		if (seenChanges.getTotallyBlockedRoad() != null) {
+		if (seenChanges.getTotallyBlockedMainRoad() != null) {
 			List<EntityID> path = randomWalk(buildingsAndRoadsInCluster);
 			if (path != null) {
 				sendMove(time, path);
@@ -363,8 +363,13 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 		}
-		for (Road road : seenChanges.getTotallyBlockedRoad()) {
-			Message message = new Message(MessageID.ROAD_BLOCKED_TOTALLY, road.getID(), time,
+		for (Road road : seenChanges.getTotallyBlockedMainRoad()) {
+			Message message = new Message(MessageID.MAIN_ROAD_BLOCKED_TOTALLY, road.getID(), time,
+					configuration.getPoliceChannel());
+			messagesWillSend.add(message);
+		}
+		for(Road road : seenChanges.getTotallyBlockedBuildingEntrance()) {
+			Message message = new Message(MessageID.ENTRANCE_BLOCKED_TOTALLY, road.getID(), time,
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 		}
