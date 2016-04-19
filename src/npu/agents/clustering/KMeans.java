@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-import npu.agents.utils.Point;
+import npu.agents.model.Point;
 import rescuecore2.misc.geometry.GeometryTools2D;
 
 public class KMeans {

@@ -1,4 +1,4 @@
-package npu.agents.utils;
+package npu.agents.model;
 
 import java.util.Set;
 

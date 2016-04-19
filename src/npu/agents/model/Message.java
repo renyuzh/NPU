@@ -1,4 +1,4 @@
-package npu.agents.communication.model;
+package npu.agents.model;
 
 import npu.agents.communication.utils.CommUtils.MessageID;
 import rescuecore2.worldmodel.EntityID;

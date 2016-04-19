@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import npu.agents.utils.Point;
+import npu.agents.model.Point;
 import rescuecore2.standard.entities.Road;
 import rescuecore2.worldmodel.EntityID;
 

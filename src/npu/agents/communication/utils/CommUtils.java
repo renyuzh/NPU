@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 
-import npu.agents.communication.model.RadioChannel;
-import npu.agents.communication.model.VoiceChannel;
+import npu.agents.model.RadioChannel;
+import npu.agents.model.VoiceChannel;
 import rescuecore2.config.Config;
 
 public class CommUtils {

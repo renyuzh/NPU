@@ -1,9 +1,10 @@
-package npu.agents.communication.utils;
+package npu.agents.utils;
 
 import java.util.ArrayList;
 
-import npu.agents.communication.model.RadioChannel;
-import npu.agents.communication.model.VoiceChannel;
+import npu.agents.communication.utils.CommUtils;
+import npu.agents.model.RadioChannel;
+import npu.agents.model.VoiceChannel;
 import rescuecore2.standard.StandardConstants;
 
 public class ConfigUtil {

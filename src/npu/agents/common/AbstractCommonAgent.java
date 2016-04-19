@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import npu.agents.communication.utils.ConfigUtil;
 import npu.agents.search.AStar;
+import npu.agents.utils.ConfigUtil;
 import rescuecore2.misc.Pair;
 import rescuecore2.standard.components.StandardAgent;
 import rescuecore2.standard.entities.Area;

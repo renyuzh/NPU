@@ -1,4 +1,4 @@
-package npu.agents.communication.model;
+package npu.agents.model;
 
 public class VoiceChannel {
 

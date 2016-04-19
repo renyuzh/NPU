@@ -9,7 +9,7 @@ import java.util.Set;
 
 import org.junit.internal.builders.AnnotatedBuilder;
 
-import npu.agents.communication.model.BuildingStatus;
+import npu.agents.model.BuildingStatus;
 import rescuecore.PlatoonAgent;
 import rescuecore2.misc.geometry.GeometryTools2D;
 import rescuecore2.misc.geometry.Line2D;

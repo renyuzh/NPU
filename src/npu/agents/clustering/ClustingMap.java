@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import npu.agents.utils.Point;
+import npu.agents.model.Point;
 import rescuecore2.log.Logger;
 import rescuecore2.misc.Pair;
 import rescuecore2.misc.geometry.GeometryTools2D;

@@ -1,4 +1,4 @@
-package npu.agents.communication.utils;
+package npu.agents.utils;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;

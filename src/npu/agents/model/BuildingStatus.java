@@ -1,4 +1,4 @@
-package npu.agents.communication.model;
+package npu.agents.model;
 
 import rescuecore2.standard.entities.AmbulanceCentre;
 import rescuecore2.standard.entities.Building;

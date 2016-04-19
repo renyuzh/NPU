@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 
-import npu.agents.utils.Point;
+import npu.agents.model.Point;
 import rescuecore2.misc.collections.LazyMap;
 import rescuecore2.standard.entities.Area;
 import rescuecore2.standard.entities.Building;
