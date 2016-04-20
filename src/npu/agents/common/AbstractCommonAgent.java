@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import npu.agents.communication.utils.MessageCompressUtil;
 import npu.agents.search.AStar;
 import npu.agents.utils.ConfigUtil;
 import rescuecore2.misc.Pair;
@@ -51,11 +52,11 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 	protected Set<EntityID> areaIDs;
 	protected Map<EntityID, Set<EntityID>> neighbours;
 
-	/*protected ChangeSetUtil seenChanges;
-	protected Set<Message> messagesWillSend = new HashSet<Message>();*/
-
 	private Map<EntityID, Set<EntityID>> entrancesOfRefuges;
-
+	
+	private List<StandardEntity> allBuildings;
+	private List<StandardEntity> allRoads;
+	private List<StandardEntity> allAreas;
 	@Override
 	protected void postConnect() {
 		super.postConnect();
@@ -64,16 +65,25 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		refuges = new HashSet<Refuge>();
 		hydrantIDs = new HashSet<EntityID>();
 		areaIDs = new HashSet<EntityID>();
+		allBuildings =  new ArrayList<StandardEntity>();
+		allRoads = new ArrayList<StandardEntity>();
+		allAreas = new ArrayList<StandardEntity>();
 		ArrayList<EntityID> test = new ArrayList<EntityID>();
 		for (StandardEntity next : model) {
 			if(next instanceof Area){
 				areaIDs.add(next.getID());
+				if(!(allAreas.contains(next)))
+					allAreas.add(next);
 			}
 			if (next instanceof Building) {
 				buildingIDs.add(next.getID());
+				if(!allBuildings.contains(next))
+					allBuildings.add(next);
 			}
 			if (next instanceof Road) {
 				roadIDs.add(next.getID());
+				if(!allRoads.contains(next))
+				allRoads.add(next);
 			}
 			if (next instanceof Refuge) {
 				refuges.add((Refuge) next);
@@ -82,129 +92,27 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 				hydrantIDs.add(next.getID());
 			}
 		}
+		System.out.println(roadIDs.size());
+		System.out.println(buildingIDs.size());
 		search = new AStar(model);
 		neighbours = search.getGraph();
 		configuration = new ConfigUtil(config);
-		/*seenChanges = new ChangeSetUtil();*/
-	}
-
-/*	protected void callForATHelp(int time, MessageID messageID) {
-		Message message = new Message(messageID, me().getID(), time, configuration.getAmbulanceChannel());
-		messagesWillSend.add(message);
-		sendRest(time);
-		System.out.println(messageID.name() + " of " + me().getID() + " at " + time);
-	}
-
-	protected boolean canMoveToRefuge(int time, Human me, Map<EntityID, Set<EntityID>> refugesEntrancesMap) {
-		Set<EntityID> refugeIDsInCluster = refugesEntrancesMap.keySet();
-		if (!refugeIDsInCluster.isEmpty()) {
-			List<EntityID> refugeIDs = new ArrayList<EntityID>(refugeIDsInCluster);
-			distanceSort(refugeIDs, me);
-			EntityID dest = ((EntityID[]) getEntrancesOfRefuges().get(refugeIDs.get(0)).toArray())[0];
-			List<EntityID> path = search.getPath(me.getPosition(), dest, null);
-			path.add(refugeIDs.get(0));
-			if (path != null) {
-				Refuge refuge = (Refuge) model.getEntity(refugeIDs.get(0));
-				Logger.info("Moving to refuge");
-				sendMove(time, path, refuge.getX(), refuge.getY());
-				System.out.println(me().getID() + "of at move to refuge for damage");
-				return true;
+		final Comparator<StandardEntity> comp = new Comparator<StandardEntity>() {
+			@Override
+			public int compare(StandardEntity o1, StandardEntity o2) {
+				if (o1.getID().getValue() < o2.getID().getValue()) {
+					return -1;
+				} else if (o1.getID().getValue() > o2.getID().getValue()) {
+					return 1;
+				}
+				return 0;
 			}
-		}
-		return false;
-	}*/
-
-	/*protected void addBuildingInfoToMessageSend(int time) {
-		
-		 * for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
-		 * Message message = new Message(MessageID.BUILDING_UNBURNT,
-		 * unburntBuidingID, time, configuration.getFireChannel());
-		 * messagesWillSend.add(message); }
-		 
-		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
-			System.out.println("send warm building message");
-			Message message = new Message(MessageID.BUILDING_WARM, warmBuidingID, time, configuration.getFireChannel());
-			messagesWillSend.add(message);
-		}
-		for (EntityID onFireBuildingID : seenChanges.getBuildingsOnFire()) {
-			System.out.println("send on fire building message");
-			Message message = new Message(MessageID.BUILDING_ON_FIRE, onFireBuildingID, time,
-					configuration.getFireChannel());
-			messagesWillSend.add(message);
-		}
-		for (EntityID extinguishBuildingID : seenChanges.getBuildingsExtinguished()) {
-			System.out.println("send extinguished building message");
-			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, extinguishBuildingID, time,
-					configuration.getFireChannel());
-			messagesWillSend.add(message);
-		}
-		for (EntityID burtOutBuildingID : seenChanges.getBuildingBurtOut()) {
-			System.out.println("send burtOut building message");
-			Message message = new Message(MessageID.BUILDING_BURNT_OUT, burtOutBuildingID, time,
-					configuration.getFireChannel());
-			messagesWillSend.add(message);
-		}
+		};
+		Collections.sort(allRoads,comp);
+		Collections.sort(allBuildings,comp);
+		Collections.sort(allAreas,comp);
+		MessageCompressUtil.init(model, allRoads, allBuildings,allAreas);
 	}
-
-	protected void addInjuredHumanInfoToMessageSend(int time) {
-		for (Human human : seenChanges.getBuriedPlatoons()) {
-			Message message = new Message(MessageID.PLATOON_BURIED, human.getPosition(), time,
-					configuration.getAmbulanceChannel());
-			if (human.getID() != me().getID())
-				messagesWillSend.add(message);
-		}
-		for (Human human : seenChanges.getInjuredCivilians()) {
-			Message message = new Message(MessageID.CIVILIAN_INJURED, human.getPosition(), time,
-					configuration.getAmbulanceChannel());
-			if (human.getID() != me().getID())
-				messagesWillSend.add(message);
-		}
-	}*/
-
-	/*public void addRoadsInfoToMessageSend(int time) {
-		for (Blockade blockade : seenChanges.getSeenBlockades()) {
-			Message message = new Message(MessageID.PLATOON_BLOCKED, blockade.getID(), time,
-					configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-		}
-		for (Road road : seenChanges.getTotallyBlockedRoad()) {
-			Message message = new Message(MessageID.ROAD_BLOCKED_TOTALLY, road.getID(), time,
-					configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-		}
-
-		for (Blockade blockadeStuckedHuman : seenChanges.getBlockadesHumanStuckedIn()) {
-			Message message = new Message(MessageID.HUMAN_STUCKED, blockadeStuckedHuman.getPosition(), time,
-					configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-		}
-		for (EntityID roadID : seenChanges.getClearedRoads()) {
-			Message message = new Message(MessageID.ROAD_CLEARED, roadID, time, configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-		}
-	}*/
-
-/*	protected void sendMessages(int time) {
-		sendAllVoiceMessages(time);
-		sendAllRadioMessages(time);
-	}
-
-	private void sendAllRadioMessages(int time) {
-		for (Message message : messagesWillSend) {
-			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
-			sendSpeak(time, message.getChannel(), data.getBytes());
-		}
-		messagesWillSend.clear();
-	}
-
-	private void sendAllVoiceMessages(int time) {
-		for (Message message : messagesWillSend) {
-			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
-			sendSpeak(time, message.getChannel(), data.getBytes());
-		}
-		messagesWillSend.clear();
-	}*/
-
 	protected List<EntityID> randomWalk(Set<EntityID> ids) {
 		List<EntityID> result = new ArrayList<EntityID>(RANDOM_WALK_LENGTH);
 		Set<EntityID> seen = new HashSet<EntityID>();
@@ -302,7 +210,6 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		}
 		return null;
 	}
-
 	public boolean in_or_out_of_polygon(ArrayList<Integer> X, ArrayList<Integer> Y, int x, int y) {
 		int i, j;
 		boolean c = false;
@@ -313,4 +220,49 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		}
 		return c;
 	}
+	/*protected int getRoadIndex(EntityID id){
+		return binarySearch(allRoads,model.getEntity(id));
+	}
+	protected int getBuildingIndex(EntityID id){
+		return binarySearch(allBuildings,model.getEntity(id));
+	}
+	protected Road getRoadByIndex(int index){
+		StandardEntity entity = allRoads.get(index);
+		if(entity instanceof Road)
+			return (Road)entity;
+		return null;
+	}
+	protected Building getBuildingByIndex(int index){
+		StandardEntity entity = allRoads.get(index);
+		if(entity instanceof Road)
+			return (Building)entity;
+		return null;
+	}
+	private int binarySearch(List<StandardEntity> entities,
+			StandardEntity standardEntity) {
+		if (entities == null || entities.size() == 0)
+			return standardEntity.getID().getValue();
+		StandardEntity[] array = entities.toArray(new StandardEntity[entities
+				.size()]);
+		return binarySearchUtil(array, array.length,standardEntity);
+	}
+	int binarySearchUtil(StandardEntity[] a, int len, StandardEntity goal)
+	{
+	    int low = 0;
+	    int high = len -1;
+	    while (low <= high)
+	    {
+	        int middle = (high - low) / 2 + low; // 直接使用(high + low) / 2 可能导致溢出
+	        if (a[middle].getID().getValue() == goal.getID().getValue())
+	            return middle;
+	        //在左半边
+	        else if (a[middle].getID().getValue() > goal.getID().getValue())
+	            high = middle - 1;
+	        //在右半边
+	        else
+	            low = middle + 1;
+	    }
+	    //没找到
+	    return -1;
+	}*/
 }

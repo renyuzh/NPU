@@ -14,80 +14,107 @@ import rescuecore2.worldmodel.EntityID;
 public class MessageHandler {
 	private Set<Message> messagesWillSend = new HashSet<Message>();
 	private ConfigUtil configuration;
+	private Set<Message> voiceMessagesWillSend = new HashSet<Message>();
 	public MessageHandler(ConfigUtil configuration){
 		this.configuration = configuration;
 	}
 	public void reportBuildingInfo(int time,ChangeSetUtil seenChanges) {
 		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
 			System.out.println("send warm building message");
-			Message message = new Message(MessageID.BUILDING_WARM, warmBuidingID, time, configuration.getFireChannel());
+			int index = MessageCompressUtil.getAreaIndex(warmBuidingID);
+			Message message = new Message(MessageID.BUILDING_WARM, index, time, configuration.getFireChannel());
 			messagesWillSend.add(message);
+			voiceMessagesWillSend.add(message);
 		}
 		for (EntityID onFireBuildingID : seenChanges.getBuildingsOnFire()) {
 			System.out.println("send on fire building message");
-			Message message = new Message(MessageID.BUILDING_ON_FIRE, onFireBuildingID, time,
+			int index = MessageCompressUtil.getAreaIndex(onFireBuildingID);
+			Message message = new Message(MessageID.BUILDING_ON_FIRE, index, time,
 					configuration.getFireChannel());
 			messagesWillSend.add(message);
+			voiceMessagesWillSend.add(message);
 		}
 		for (EntityID extinguishBuildingID : seenChanges.getBuildingsExtinguished()) {
 			System.out.println("send extinguished building message");
-			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, extinguishBuildingID, time,
+			int index = MessageCompressUtil.getAreaIndex(extinguishBuildingID);
+			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, index, time,
 					configuration.getFireChannel());
 			messagesWillSend.add(message);
+			voiceMessagesWillSend.add(message);
 		}
 		for (EntityID burtOutBuildingID : seenChanges.getBuildingBurtOut()) {
 			System.out.println("send burtOut building message");
-			Message message = new Message(MessageID.BUILDING_BURNT_OUT, burtOutBuildingID, time,
+			int index = MessageCompressUtil.getAreaIndex(burtOutBuildingID);
+			Message message = new Message(MessageID.BUILDING_BURNT_OUT, index, time,
 					configuration.getFireChannel());
 			messagesWillSend.add(message);
+			voiceMessagesWillSend.add(message);
 		}
 	}
 
 	public void reportInjuredHumanInfo(int time,ChangeSetUtil seenChanges) {
 		for (Human human : seenChanges.getBuriedPlatoons()) {
-			Message message = new Message(MessageID.PLATOON_BURIED, human.getPosition(), time,
+			int index = MessageCompressUtil.getAreaIndex(human.getPosition());
+			Message message = new Message(MessageID.PLATOON_BURIED, index, time,
 					configuration.getAmbulanceChannel());
 				messagesWillSend.add(message);
+				voiceMessagesWillSend.add(message);
 		}
 		for (Human human : seenChanges.getInjuredCivilians()) {
-			Message message = new Message(MessageID.CIVILIAN_INJURED, human.getPosition(), time,
+			int index = MessageCompressUtil.getAreaIndex(human.getPosition());
+			Message message = new Message(MessageID.CIVILIAN_INJURED, index, time,
 					configuration.getAmbulanceChannel());
 				messagesWillSend.add(message);
+				voiceMessagesWillSend.add(message);
 		}
 	}
 
 	public void reportRoadsInfo(int time,ChangeSetUtil seenChanges) {
 		for (Blockade blockade : seenChanges.getSeenBlockades()) {
-			Message message = new Message(MessageID.PLATOON_BLOCKED, blockade.getID(), time,
+			int index = MessageCompressUtil.getAreaIndex(blockade.getPosition());
+			Message message = new Message(MessageID.PLATOON_BLOCKED, index, time,
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message);
+			voiceMessagesWillSend.add(message);
 		}
 		for (Road road : seenChanges.getTotallyBlockedBuildingEntrance()) {
-			Message message = new Message(MessageID.ENTRANCE_BLOCKED_TOTALLY, road.getID(), time,
+			int index = MessageCompressUtil.getAreaIndex(road.getID());
+			Message message = new Message(MessageID.ENTRANCE_BLOCKED_TOTALLY, index, time,
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message);
+			voiceMessagesWillSend.add(message);
 		}
 		
 		for (Road road : seenChanges.getTotallyBlockedMainRoad()) {
-			Message message = new Message(MessageID.MAIN_ROAD_BLOCKED_TOTALLY, road.getID(), time,
+			int index = MessageCompressUtil.getAreaIndex(road.getID());
+			Message message = new Message(MessageID.MAIN_ROAD_BLOCKED_TOTALLY,index, time,
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message);
+			voiceMessagesWillSend.add(message);
 		}
 
 		for (Blockade blockadeStuckedHuman : seenChanges.getBlockadesHumanStuckedIn()) {
-			Message message = new Message(MessageID.HUMAN_STUCKED, blockadeStuckedHuman.getPosition(), time,
+			int index = MessageCompressUtil.getAreaIndex(blockadeStuckedHuman.getPosition());
+			Message message = new Message(MessageID.HUMAN_STUCKED, index, time,
 					configuration.getPoliceChannel());
 			messagesWillSend.add(message);
+			voiceMessagesWillSend.add(message);
 		}
 		for (EntityID roadID : seenChanges.getClearedRoads()) {
-			Message message = new Message(MessageID.ROAD_CLEARED, roadID, time, configuration.getPoliceChannel());
+			int index = MessageCompressUtil.getAreaIndex(roadID);
+			Message message = new Message(MessageID.ROAD_CLEARED, index, time, configuration.getPoliceChannel());
 			messagesWillSend.add(message);
+			voiceMessagesWillSend.add(message);
 		}
 	}
 	public Set<Message> getMessagesWillSend() {
 		return messagesWillSend;
 	}
+	public Set<Message> getVoiceMessagesWillSend() {
+		return voiceMessagesWillSend;
+	}
 	public void addMessage(Message message) {
 		messagesWillSend.add(message);
+		voiceMessagesWillSend.add(message);
 	}
 }

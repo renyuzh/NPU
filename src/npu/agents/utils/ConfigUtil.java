@@ -148,7 +148,7 @@ public class ConfigUtil {
 
 	public RadioChannel getRadioChannelByID(int id) {
 		for (RadioChannel r : radioChannels)
-			if (r.id == id)
+			if (r.getId() == id)
 				return r;
 		return null;
 	}

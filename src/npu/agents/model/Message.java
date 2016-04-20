@@ -5,14 +5,14 @@ import rescuecore2.worldmodel.EntityID;
 
 public class Message {
 	private MessageID messageID;
-	private EntityID positionID;
+	private int index;
 	private int time;
 	private int channel;
 
-	public Message(MessageID messageID, EntityID positionID, int time, int channel) {
+	public Message(MessageID messageID, int index, int time, int channel) {
 		super();
 		this.messageID = messageID;
-		this.positionID = positionID;
+		this.index = index;
 		this.time = time;
 		this.channel = channel;
 	}
@@ -21,12 +21,12 @@ public class Message {
 		return messageID;
 	}
 
-	public EntityID getPositionID() {
-		return positionID;
+	public int getIndex() {
+		return index;
 	}
 
-	public void setPostionID(EntityID positionID) {
-		this.positionID = positionID;
+	public void setIndex(int index) {
+		this.index = index;
 	}
 
 	public int getTime() {
@@ -44,31 +44,8 @@ public class Message {
 	public void setChannel(int channel) {
 		this.channel = channel;
 	}
-
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((messageID == null) ? 0 : messageID.hashCode());
-		result = prime * result + ((positionID == null) ? 0 : positionID.hashCode());
-		return result;
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		Message other = (Message) obj;
-		if (messageID != other.messageID)
-			return false;
-		if (positionID == null) {
-			if (other.positionID != null)
-				return false;
-		} else if (!positionID.equals(other.positionID))
-			return false;
-		return true;
+	public String toMessage(){
+		return getMessageID().ordinal()+","+index;
 	}
 
 }

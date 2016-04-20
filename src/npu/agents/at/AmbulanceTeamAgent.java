@@ -14,6 +14,8 @@ import npu.agents.clustering.ClustingMap;
 import npu.agents.clustering.ClustingMap3;
 import npu.agents.common.AbstractCommonAgent;
 import npu.agents.communication.utils.ChangeSetUtil;
+import npu.agents.communication.utils.MessageCompressUtil;
+import npu.agents.communication.utils.MessageHandler;
 import npu.agents.communication.utils.CommUtils.MessageID;
 import npu.agents.model.Message;
 import npu.agents.utils.DistanceSorter;
@@ -52,7 +54,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 	private Set<EntityID> injuredCiviliansPositions = new HashSet<EntityID>();
 	private Set<EntityID> injuredPlatoonsPositions = new HashSet<EntityID>();
 	private Map<EntityID, Set<EntityID>> refugesEntrancesMap;
-
+	private MessageHandler messageHandler;
 	public ChangeSetUtil seenChanges;
 	public Set<Message> messagesWillSend = new HashSet<Message>();
 	
@@ -76,6 +78,7 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 			buildingsAndRoadsInCluster.addAll(roadsInCluster);
 			refugesEntrancesMap = cluster.getRoadARoundRefuge();
 			seenChanges = new ChangeSetUtil();
+			messageHandler = new MessageHandler(configuration);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("聚类失败");
@@ -103,15 +106,16 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 		}
 		handleHeard(time, heard);
 		seenChanges.handleChanges(model, changes);
-		addBuildingInfoToMessageSend(time);
-		addRoadsInfoToMessageSend(time);
+		messageHandler.reportBuildingInfo(time, seenChanges);
+		messageHandler.reportRoadsInfo(time, seenChanges);
 		updateHelpedHuman();
 		if(somethingWrong(time))
 		{
 		}
 		EntityID position = positionWhereIStuckedIn(seenChanges.getSeenBlockades(), me());
 		if (position != null) {
-			Message message = new Message(MessageID.PLATOON_STUCKED, position, time, configuration.getPoliceChannel());
+			int index = MessageCompressUtil.getAreaIndex(position);
+			Message message = new Message(MessageID.PLATOON_STUCKED, index, time, configuration.getPoliceChannel());
 			messagesWillSend.add(message);
 			return;
 		}
@@ -186,7 +190,8 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 						&& civilian.getHP() > 0 && (civilian.getBuriedness() > 0 || civilian.getDamage() > 0)) {
 					buriedCivilianPostions.add(civilianPositionID);
 				} else {
-					Message message = new Message(MessageID.CIVILIAN_BlOCKED, civilianPositionID, time,
+					int index = MessageCompressUtil.getAreaIndex(civilianPositionID);
+					Message message = new Message(MessageID.CIVILIAN_BlOCKED, index, time,
 							configuration.getPoliceChannel());
 					messagesWillSend.add(message);
 				}
@@ -333,7 +338,8 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 		return false;
 	}
 	public void callForATHelp(int time, MessageID messageID) {
-		Message message = new Message(messageID, me().getID(), time, configuration.getAmbulanceChannel());
+        int index = MessageCompressUtil.getAreaIndex(me().getPosition());
+		Message message = new Message(messageID, index, time, configuration.getAmbulanceChannel());
 		messagesWillSend.add(message);
 		sendRest(time);
 		System.out.println(messageID.name() + " of " + me().getID() + " at " + time);
@@ -357,64 +363,6 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 		}
 		return false;
 	}
-	public void addRoadsInfoToMessageSend(int time) {
-		for (Blockade blockade : seenChanges.getSeenBlockades()) {
-			Message message = new Message(MessageID.PLATOON_BLOCKED, blockade.getID(), time,
-					configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-		}
-		for (Road road : seenChanges.getTotallyBlockedMainRoad()) {
-			Message message = new Message(MessageID.MAIN_ROAD_BLOCKED_TOTALLY, road.getID(), time,
-					configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-		}
-		for(Road road : seenChanges.getTotallyBlockedBuildingEntrance()) {
-			Message message = new Message(MessageID.ENTRANCE_BLOCKED_TOTALLY, road.getID(), time,
-					configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-		}
-
-		for (Blockade blockadeStuckedHuman : seenChanges.getBlockadesHumanStuckedIn()) {
-			Message message = new Message(MessageID.HUMAN_STUCKED, blockadeStuckedHuman.getPosition(), time,
-					configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-		}
-		for (EntityID roadID : seenChanges.getClearedRoads()) {
-			Message message = new Message(MessageID.ROAD_CLEARED, roadID, time, configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-		}
-	}
-	public void addBuildingInfoToMessageSend(int time) {
-		
-		/* * for (EntityID unburntBuidingID : seenChanges.getBuildingsUnburnt()) {
-		 * Message message = new Message(MessageID.BUILDING_UNBURNT,
-		 * unburntBuidingID, time, configuration.getFireChannel());
-		 * messagesWillSend.add(message); }*/
-		 
-		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
-			System.out.println("send warm building message");
-			Message message = new Message(MessageID.BUILDING_WARM, warmBuidingID, time, configuration.getFireChannel());
-			messagesWillSend.add(message);
-		}
-		for (EntityID onFireBuildingID : seenChanges.getBuildingsOnFire()) {
-			System.out.println("send on fire building message");
-			Message message = new Message(MessageID.BUILDING_ON_FIRE, onFireBuildingID, time,
-					configuration.getFireChannel());
-			messagesWillSend.add(message);
-		}
-		for (EntityID extinguishBuildingID : seenChanges.getBuildingsExtinguished()) {
-			System.out.println("send extinguished building message");
-			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, extinguishBuildingID, time,
-					configuration.getFireChannel());
-			messagesWillSend.add(message);
-		}
-		for (EntityID burtOutBuildingID : seenChanges.getBuildingBurtOut()) {
-			System.out.println("send burtOut building message");
-			Message message = new Message(MessageID.BUILDING_BURNT_OUT, burtOutBuildingID, time,
-					configuration.getFireChannel());
-			messagesWillSend.add(message);
-		}
-	}
 	public void sendMessages(int time) {
 		sendAllVoiceMessages(time);
 		sendAllRadioMessages(time);
@@ -422,16 +370,14 @@ public class AmbulanceTeamAgent extends AbstractCommonAgent<AmbulanceTeam> {
 
 	private void sendAllRadioMessages(int time) {
 		for (Message message : messagesWillSend) {
-			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
-			sendSpeak(time, message.getChannel(), data.getBytes());
+			sendSpeak(time, message.getChannel(),message.toMessage().getBytes());
 		}
 		messagesWillSend.clear();
 	}
 
 	private void sendAllVoiceMessages(int time) {
 		for (Message message : messagesWillSend) {
-			String data = message.getMessageID().ordinal() + "," + message.getPositionID().getValue();
-			sendSpeak(time, message.getChannel(), data.getBytes());
+			sendSpeak(time, message.getChannel(), message.toMessage().getBytes());
 		}
 		messagesWillSend.clear();
 	}
