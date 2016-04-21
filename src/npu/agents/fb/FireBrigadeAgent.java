@@ -64,6 +64,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	
 	private ChangeSetUtil seenChanges;
 	private MessageHandler messageHandler;
+	private int count;
 	@Override
 	public void postConnect() {
 		super.postConnect();
@@ -99,7 +100,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	}
 
 	public void handleReceiveMessages(int time, ChangeSet changes, Collection<Command> heard) {
-		if (time == configuration.getIgnoreAgentCommand()) {
+/*		if (time == configuration.getIgnoreAgentCommand()) {
 			sendSubscribe(time, configuration.getFireChannel());// 注册了该通道的都可以接收到
 			if (me().isHPDefined() && me().isBuriednessDefined() && me().getHP() > 0 && me().getBuriedness() > 0) {
 				// TODO 暂时不管
@@ -113,7 +114,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		seenChanges.handleChanges(model, changes);
 		callOtherFBHelp(time);
 		messageHandler.reportInjuredHumanInfo(time, seenChanges);
-		messageHandler.reportRoadsInfo(time, seenChanges);
+		messageHandler.reportRoadsInfo(time, seenChanges);*/
 /*		updateExtinguishedBuildings(time);*/
 		/*if (somethingWrong(time)){
 		}*/
@@ -121,17 +122,22 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 		if (position != null) {
 			int index = MessageCompressUtil.getAreaIndex(position);
 			Message message = new Message(MessageID.HUMAN_STUCKED, index, time, configuration.getPoliceChannel());
-			messagesWillSend.add(message);
-			System.out.println("困死了");
+			System.out.println(me().getID()+" of fb 被困在了障碍物中");
+			if(count < 3){
+				messageHandler.addMessage(message);
+				count++;
+			}else{
+				messageHandler.addVoiceMessage(message);
+			}
 			return;
 		}
-		if (me().isHPDefined() && me().isDamageDefined() && me().getHP() > 0 && me().getDamage() > 0) {
+/*		if (me().isHPDefined() && me().isDamageDefined() && me().getHP() > 0 && me().getDamage() > 0) {
 			if (canMoveToRefuge(time, me(), refugesEntrancesMap)) {
 			} else {
 				callForATHelp(time, MessageID.PLATOON_BURIED);
 			}
 			System.out.println(me().getID() + " is buried,hp is" + me().getHP() + ",damage is" + me().getDamage());
-		}
+		}*/
 /*		if (isFillingWater(time))
 			return;
 		if (mainRoadBlockedTotally(time)) {
@@ -466,17 +472,17 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	}
 
 	private void sendAllRadioMessages(int time) {
-		for (Message message : messagesWillSend) {
+		for (Message message : messageHandler.getMessagesWillSend()) {
 			sendSpeak(time, message.getChannel(), message.toMessage().getBytes());
 		}
-		messagesWillSend.clear();
+		messageHandler.getMessagesWillSend().clear();
 	}
 
 	private void sendAllVoiceMessages(int time) {
-		for (Message message : messagesWillSend) {
-			sendSpeak(time, message.getChannel(), message.toMessage().getBytes());
+		for (Message message : messageHandler.getVoiceMessagesWillSend()) {
+			sendSpeak(time, configuration.getVoiceChannels().get(0).id, message.toMessage().getBytes());
 		}
-		messagesWillSend.clear();
+		messageHandler.getVoiceMessagesWillSend().clear();
 	}
 	private boolean somethingWrong(int time){
 		prePosition[1] = prePosition[0];

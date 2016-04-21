@@ -115,6 +115,9 @@ public class MessageHandler {
 	}
 	public void addMessage(Message message) {
 		messagesWillSend.add(message);
+	}
+	public void addVoiceMessage(Message message){
 		voiceMessagesWillSend.add(message);
+		
 	}
 }

@@ -176,6 +176,30 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 			}
 		});
 	}
+	protected void distanceSort2(List<StandardEntity> bidder, final StandardEntity seller){
+		Collections.sort(bidder, new Comparator<StandardEntity>() {
+			@Override
+			public int compare(StandardEntity o1, StandardEntity o2) {
+				int d1 = model.getDistance(seller, o1);
+				int d2 = model.getDistance(seller, o2);
+				return d1 - d2;
+			}
+		});
+	}
+	protected void distanceSort3(List<EntityID> bidders, final Area seller){
+		Collections.sort(bidders, new Comparator<EntityID>() {
+			@Override
+			public int compare(EntityID o1, EntityID o2) {
+				int distance1 = findDistanceTo(o1, seller.getX(), seller.getY());
+				int distance2 = findDistanceTo(o2, seller.getX(), seller.getY());
+				if (distance1 > distance2)
+					return 1;
+				if (distance1 < distance2)
+					return -1;
+				return 0;
+			}
+		});
+	}
 
 	protected int findDistanceTo(EntityID id, int x, int y) {
 		StandardEntity entity = model.getEntity(id);
@@ -204,7 +228,6 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 				Y.add(blockade.getApexes()[i + 1]);
 			}
 			if (in_or_out_of_polygon(X, Y, me.getX(), me.getY())) {
-				System.out.println(me().getID()+" 我就这样被无情的困死了，救命啊");
 				return blockade.getPosition();
 			}
 		}
@@ -220,49 +243,4 @@ public abstract class AbstractCommonAgent<E extends StandardEntity> extends Stan
 		}
 		return c;
 	}
-	/*protected int getRoadIndex(EntityID id){
-		return binarySearch(allRoads,model.getEntity(id));
-	}
-	protected int getBuildingIndex(EntityID id){
-		return binarySearch(allBuildings,model.getEntity(id));
-	}
-	protected Road getRoadByIndex(int index){
-		StandardEntity entity = allRoads.get(index);
-		if(entity instanceof Road)
-			return (Road)entity;
-		return null;
-	}
-	protected Building getBuildingByIndex(int index){
-		StandardEntity entity = allRoads.get(index);
-		if(entity instanceof Road)
-			return (Building)entity;
-		return null;
-	}
-	private int binarySearch(List<StandardEntity> entities,
-			StandardEntity standardEntity) {
-		if (entities == null || entities.size() == 0)
-			return standardEntity.getID().getValue();
-		StandardEntity[] array = entities.toArray(new StandardEntity[entities
-				.size()]);
-		return binarySearchUtil(array, array.length,standardEntity);
-	}
-	int binarySearchUtil(StandardEntity[] a, int len, StandardEntity goal)
-	{
-	    int low = 0;
-	    int high = len -1;
-	    while (low <= high)
-	    {
-	        int middle = (high - low) / 2 + low; // 直接使用(high + low) / 2 可能导致溢出
-	        if (a[middle].getID().getValue() == goal.getID().getValue())
-	            return middle;
-	        //在左半边
-	        else if (a[middle].getID().getValue() > goal.getID().getValue())
-	            high = middle - 1;
-	        //在右半边
-	        else
-	            low = middle + 1;
-	    }
-	    //没找到
-	    return -1;
-	}*/
 }

@@ -37,7 +37,7 @@ public class MessageCompressUtil {
 	}
 	public static Building getBuildingByIndex(int index){
 		StandardEntity entity = allRoads.get(index);
-		if(entity instanceof Road)
+		if(entity instanceof Building)
 			return (Building)entity;
 		return null;
 	}
