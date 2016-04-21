@@ -100,7 +100,7 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 	}
 
 	public void handleReceiveMessages(int time, ChangeSet changes, Collection<Command> heard) {
-/*		if (time == configuration.getIgnoreAgentCommand()) {
+		if (time == configuration.getIgnoreAgentCommand()) {
 			sendSubscribe(time, configuration.getFireChannel());// 注册了该通道的都可以接收到
 			if (me().isHPDefined() && me().isBuriednessDefined() && me().getHP() > 0 && me().getBuriedness() > 0) {
 				// TODO 暂时不管
@@ -109,26 +109,26 @@ public class FireBrigadeAgent extends AbstractCommonAgent<FireBrigade> {
 			}
 			return;
 		}
-		System.out.println(me().getID()+" 我可以清理的最远距离 "+maxDistance);
-		handleHeard(time, heard);
+		//System.out.println(me().getID()+" 我可以清理的最远距离 "+maxDistance);
+		//handleHeard(time, heard);
 		seenChanges.handleChanges(model, changes);
-		callOtherFBHelp(time);
+		/*callOtherFBHelp(time);
 		messageHandler.reportInjuredHumanInfo(time, seenChanges);
-		messageHandler.reportRoadsInfo(time, seenChanges);*/
-/*		updateExtinguishedBuildings(time);*/
+		messageHandler.reportRoadsInfo(time, seenChanges);
+		updateExtinguishedBuildings(time);*/
 		/*if (somethingWrong(time)){
 		}*/
 		EntityID position = positionWhereIStuckedIn(seenChanges.getSeenBlockades(), me());
 		if (position != null) {
 			int index = MessageCompressUtil.getAreaIndex(position);
 			Message message = new Message(MessageID.HUMAN_STUCKED, index, time, configuration.getPoliceChannel());
-			System.out.println(me().getID()+" of fb 被困在了障碍物中");
 			if(count < 3){
+				System.out.println(me().getID()+" of fb 被困在了障碍物中");
 				messageHandler.addMessage(message);
 				count++;
-			}else{
+			}/*else{
 				messageHandler.addVoiceMessage(message);
-			}
+			}*/
 			return;
 		}
 /*		if (me().isHPDefined() && me().isDamageDefined() && me().getHP() > 0 && me().getDamage() > 0) {

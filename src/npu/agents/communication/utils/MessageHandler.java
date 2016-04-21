@@ -20,14 +20,14 @@ public class MessageHandler {
 	}
 	public void reportBuildingInfo(int time,ChangeSetUtil seenChanges) {
 		for (EntityID warmBuidingID : seenChanges.getBuildingsIsWarm()) {
-			System.out.println("send warm building message");
+			//System.out.println("send warm building message");
 			int index = MessageCompressUtil.getAreaIndex(warmBuidingID);
 			Message message = new Message(MessageID.BUILDING_WARM, index, time, configuration.getFireChannel());
 			messagesWillSend.add(message);
 			voiceMessagesWillSend.add(message);
 		}
 		for (EntityID onFireBuildingID : seenChanges.getBuildingsOnFire()) {
-			System.out.println("send on fire building message");
+			//System.out.println("send on fire building message");
 			int index = MessageCompressUtil.getAreaIndex(onFireBuildingID);
 			Message message = new Message(MessageID.BUILDING_ON_FIRE, index, time,
 					configuration.getFireChannel());
@@ -35,7 +35,7 @@ public class MessageHandler {
 			voiceMessagesWillSend.add(message);
 		}
 		for (EntityID extinguishBuildingID : seenChanges.getBuildingsExtinguished()) {
-			System.out.println("send extinguished building message");
+			//System.out.println("send extinguished building message");
 			int index = MessageCompressUtil.getAreaIndex(extinguishBuildingID);
 			Message message = new Message(MessageID.BUILDING_EXTINGUISHED, index, time,
 					configuration.getFireChannel());
@@ -43,7 +43,7 @@ public class MessageHandler {
 			voiceMessagesWillSend.add(message);
 		}
 		for (EntityID burtOutBuildingID : seenChanges.getBuildingBurtOut()) {
-			System.out.println("send burtOut building message");
+			//System.out.println("send burtOut building message");
 			int index = MessageCompressUtil.getAreaIndex(burtOutBuildingID);
 			Message message = new Message(MessageID.BUILDING_BURNT_OUT, index, time,
 					configuration.getFireChannel());

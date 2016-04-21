@@ -144,12 +144,12 @@ public   class ChangeSetUtil {
 			}
 			if (isBuildingStatusWorse(building)) {
 				worseStatusBuildings.add(building.getID());
-				System.out.print(building.getID() + " building worse ");
+				//System.out.print(building.getID() + " building worse ");
 			}
 			if (buildingStatus.isOnFire()) {
 				buildingsOnFire.add(building.getID());
 				countOfFieryBuildings++;
-				System.out.println(building.getID() + " building on Fire ");
+				//System.out.println(building.getID() + " building on Fire ");
 			} else {
 				buildingsOnFire.remove(building.getID());
 			}
@@ -427,7 +427,7 @@ public   class ChangeSetUtil {
 	}
 
 	public synchronized  void previousChangesClear() {
-		System.out.println("clear pre seenChanges");
+		//System.out.println("clear pre seenChanges");
 
 		// TODO 这些到底是每次清空还是保存部分再更新
 		buildings.clear();

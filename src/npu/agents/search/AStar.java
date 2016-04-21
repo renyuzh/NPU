@@ -137,7 +137,9 @@ public class AStar {
 	       @param goals The set of possible goals.
 	       @return The path from start to one of the goals, or null if no path can be found.
 	    */
-	    public List<EntityID> breadthFirstSearch(EntityID start, Collection<EntityID> goals) {
+	    public List<EntityID> breadthFirstSearch(EntityID start, List<EntityID> goals) {
+	    	if(start == null || goals.size() == 0 || goals.contains(start))
+				return null;
 	        List<EntityID> open = new LinkedList<EntityID>();
 	        Map<EntityID, EntityID> ancestors = new HashMap<EntityID, EntityID>();
 	        open.add(start);
